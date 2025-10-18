@@ -1,0 +1,43 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3:*)",
+      "Bash(cat:*)",
+      "Bash(pkill:*)",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a3%d9%8e%d8%a8%d9%91%d9%8e/?book=9')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%a1/?book=5')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%a3/?book=8')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%af%d9%8e-2/?book=21')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a3%d8%a8%d8%a8/?book=3')",
+      "Bash(git clone:*)",
+      "Read(//Users/alqatari/agent/lisan/**)",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%a8%d9%8e%d9%83%d9%8f/?book=21')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%a3/?book=21')",
+      "Bash(curl -s 'https://arabiclexicon.hawramani.com/%d8%a2%d8%af%d9%8e-2/?book=21' -o /tmp/qamus_success.html)",
+      "Read(//private/tmp/**)",
+      "Bash(for dir in /Users/alqatari/agent/lisan/aralex/*_output)",
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(find:*)",
+      "Bash(awk:*)",
+      "Bash(lsof:*)",
+      "Bash(curl:*)",
+      "Bash(for dir in ain_output lisan_output maqayis_output mofradat_output muhkam_output sihah_output qamus_output)",
+      "Bash(do echo \"=== $dir ===\")",
+      "Bash(mkdir -p scrapers docs)",
+      "Bash(mv ain_scraper.py ain_url_extractor.py ain_urls.json scrapers/)",
+      "Bash(mv lisan_scraper.py lisan_url_extractor.py lisan_urls.json lisan_scraper.log scrapers/)",
+      "Bash(mv maqayis_scraper.py maqayis_url_extractor.py maqayis_urls.json scrapers/)",
+      "Bash(mv mofradat_scraper.py mofradat_url_extractor.py mofradat_urls.json scrapers/)",
+      "Bash(ps -p 13744 -o etime,cputime)",
+      "Bash(mv qamus_scraper.py qamus_url_extractor.py qamus_urls.json scrapers/)",
+      "Bash(mv qamus_scraper.log qamus_full_scrape_fixed.log qamus_full_scrape.log qamus_scraper_resume.log scrapers/)",
+      "Bash(tree -L 3 -a --dirsfirst -I '.git|.DS_Store|__pycache__' /Users/alqatari/agent/lisan/aralex)",
+      "Bash(git init)",
+      "Bash(git branch -m main)",
+      "Bash(git add .gitignore .claude/ data/)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

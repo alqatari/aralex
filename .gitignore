@@ -1,0 +1,34 @@
+# Scrapers (completed work, large files)
+scrapers/
+
+# Old documentation
+docs_old/
+
+# Research PDFs and large files
+data/letter_meanings/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
