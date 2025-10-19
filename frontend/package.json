@@ -1,0 +1,26 @@
+{
+  "name": "aralex-frontend",
+  "version": "0.1.0",
+  "description": "Quranic Phonosemantic Analysis System - Frontend",
+  "scripts": {
+    "build": "spago build",
+    "bundle": "spago bundle-app --to dist/index.js",
+    "serve": "spago build --watch & parcel serve public/index.html"
+  },
+  "keywords": [
+    "purescript",
+    "halogen",
+    "arabic",
+    "quran"
+  ],
+  "author": "Ali Al-Qatari",
+  "license": "MIT",
+  "devDependencies": {
+    "parcel": "^2.12.0",
+    "purescript": "^0.15.15",
+    "spago": "^0.93.40"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.11"
+  }
+}

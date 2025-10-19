@@ -1,0 +1,26 @@
+# Spago/Purescript
+.spago/
+output/
+.psa-stash/
+.psci_modules/
+.psci
+
+# Generated types from Haskell
+src/Generated/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Parcel
+dist/
+.parcel-cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

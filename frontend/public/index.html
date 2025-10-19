@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aralex - Arabic Phonosemantic Analysis</title>
+
+    <!-- Google Fonts - Arabic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Readex+Pro:wght@300;400;600&family=Lalezar&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- Google Fonts - Latin -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,600&family=Oswald:wght@400;600&family=Cascadia+Code&display=swap" rel="stylesheet">
+
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Roboto Flex', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .app-container {
+            background: white;
+            border-radius: 16px;
+            padding: 0;
+            max-width: 1000px;
+            width: 100%;
+            margin: 0 auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 40px 40px 30px 40px;
+            text-align: center;
+            color: white;
+        }
+
+        .app-title {
+            font-family: 'Lalezar', cursive;
+            font-size: 3.1rem;
+            color: white;
+            margin: 0 0 10px 0;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-family: 'Aref Ruqaa', serif;
+            font-size: 2.7rem;
+            color: rgba(255, 255, 255, 0.95);
+            margin: 0;
+            direction: rtl;
+            font-weight: 400;
+        }
+
+        .page-served-time {
+            font-family: 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin: 10px 0 0 0;
+            direction: ltr;
+            text-align: center;
+        }
+
+        /* Search Section */
+        .search-section {
+            padding: 40px 40px;
+            background: #fafafa;
+        }
+
+        .search-form {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .search-input-group {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 16px 20px;
+            font-size: 1.3rem;
+            font-family: 'Scheherazade New', serif;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            direction: rtl;
+            text-align: right;
+            transition: all 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-button {
+            padding: 16px 40px;
+            font-size: 1.2rem;
+            font-family: 'Scheherazade New', serif;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .search-button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .search-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .search-hint {
+            text-align: center;
+            color: #888;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        /* Results Section */
+        .results-section {
+            padding: 40px;
+            min-height: 200px;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            border: 1px solid #fcc;
+        }
+
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-size: 1.2rem;
+            padding: 40px;
+        }
+
+        /* Verses Section */
+        .verses-section {
+            max-width: 800px;
+            margin: 0 auto 20px auto;
+        }
+
+        .verses-header {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.4rem;
+            color: #667eea;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 3px solid #667eea;
+            direction: rtl;
+            text-align: right;
+            font-weight: 700;
+        }
+
+        .verses-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .verse-entry {
+            background: linear-gradient(135deg, #f8f9ff 0%, #fff5f8 100%);
+            border: 2px solid #e0e8ff;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .verse-entry:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.15);
+        }
+
+        .verse-ref {
+            font-family: 'Readex Pro', sans-serif;
+            font-size: 0.95rem;
+            color: #667eea;
+            margin-bottom: 12px;
+            direction: rtl;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .verse-text {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.8rem;
+            line-height: 2.8;
+            color: #1a1a1a;
+            margin-bottom: 16px;
+            direction: rtl;
+            text-align: right;
+            padding: 16px;
+            background: white;
+            border-radius: 8px;
+            border-right: 4px solid #667eea;
+        }
+
+        .verse-info {
+            font-family: 'Readex Pro', sans-serif;
+            font-size: 0.9rem;
+            color: #764ba2;
+            direction: rtl;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .dictionary-results {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .results-header {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.3rem;
+            color: #555;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #667eea;
+            direction: rtl;
+            text-align: right;
+        }
+
+        .dict-groups {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .dict-group {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .dict-header {
+            background: #f5f5f5;
+            padding: 16px 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: background 0.2s;
+            user-select: none;
+            direction: rtl;
+        }
+
+        .dict-header:hover {
+            background: #ececec;
+        }
+
+        .expand-icon {
+            font-size: 0.9rem;
+            color: #667eea;
+            font-weight: bold;
+            min-width: 20px;
+        }
+
+        .dict-name {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.1rem;
+            color: #333;
+            margin: 0;
+            flex: 1;
+            direction: rtl;
+            text-align: right;
+        }
+
+        .entry-count {
+            font-size: 0.9rem;
+            color: #888;
+            font-weight: 600;
+        }
+
+        .dict-entries {
+            padding: 12px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .dictionary-entry {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: box-shadow 0.2s;
+        }
+
+        .dictionary-entry:hover {
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .entry-header {
+            margin-bottom: 16px;
+        }
+
+        .entry-root {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.8rem;
+            color: #667eea;
+            direction: rtl;
+            text-align: right;
+            margin: 0;
+            font-weight: 700;
+        }
+
+        .entry-definition {
+            font-family: 'Scheherazade New', serif;
+            font-size: 1.2rem;
+            line-height: 2;
+            color: #333;
+            direction: rtl;
+            text-align: right;
+            white-space: pre-wrap;
+        }
+
+        /* Footer */
+        .info-footer {
+            background: #f5f5f5;
+            padding: 20px 40px;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .info-text {
+            color: #666;
+            font-size: 0.95rem;
+            margin: 0;
+        }
+
+        code {
+            font-family: 'Cascadia Code', monospace;
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script src="/dist/bundle.js"></script>
+</body>
+</html>

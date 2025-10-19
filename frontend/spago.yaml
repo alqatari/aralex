@@ -1,0 +1,27 @@
+package:
+  name: aralex-frontend
+  dependencies:
+    - aff
+    - affjax-web
+    - argonaut-aeson-generic
+    - argonaut-core
+    - argonaut-codecs
+    - arrays
+    - console
+    - effect
+    - either
+    - foldable-traversable
+    - halogen
+    - maybe
+    - prelude
+    - strings
+    - transformers
+    - tuples
+    - web-html
+    - profunctor-lenses
+    - newtype
+    - datetime
+
+workspace:
+  package_set:
+    registry: "50.0.0"
