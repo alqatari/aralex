@@ -1191,9 +1191,6 @@ render state =
         , HH.p
             [ HP.class_ (HH.ClassName "subtitle") ]
             [ HH.text "بلسان عربي مبين" ]
-        , HH.p
-            [ HP.style "font-size: 1rem; color: rgba(255, 255, 255, 0.8); margin-top: 10px;" ]
-            [ HH.text "IT IS NOT A BUNDLE ISSUE" ]
         ]
 
     -- Search Section
