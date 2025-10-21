@@ -32,3 +32,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Project-specific ignores
+data/
+docs/
+CLAUDE.md
+dev.sh
+fly.toml

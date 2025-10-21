@@ -1,0 +1,12 @@
+-- Project-specific GHCi configuration for Aralex backend
+-- Overrides ~/.ghci to avoid missing package errors
+
+:set prompt "\ESC[34m\STXaralex λ: \ESC[m\STX"
+:set -fno-warn-unused-imports
+:set -XOverloadedStrings
+
+-- Import commonly used modules
+import Control.Applicative
+import Control.Monad
+import Data.Text (Text)
+import qualified Data.Text as T

@@ -11,20 +11,25 @@
             "argonaut-codecs",
             "argonaut-core",
             "arrays",
+            "canvas",
             "console",
             "datetime",
             "effect",
             "either",
             "foldable-traversable",
             "halogen",
+            "halogen-svg-elems",
             "maybe",
             "newtype",
             "prelude",
             "profunctor-lenses",
+            "refs",
             "strings",
             "transformers",
             "tuples",
-            "web-html"
+            "web-events",
+            "web-html",
+            "web-uievents"
           ],
           "build_plan": [
             "aff",
@@ -38,6 +43,7 @@
             "arrays",
             "avar",
             "bifunctors",
+            "canvas",
             "catenable-lists",
             "console",
             "const",
@@ -63,6 +69,7 @@
             "gen",
             "halogen",
             "halogen-subscriptions",
+            "halogen-svg-elems",
             "halogen-vdom",
             "http-methods",
             "identity",
@@ -788,6 +795,18 @@
         "tuples"
       ]
     },
+    "canvas": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-Y4L0bTJu4budLhb24ImGUb3s0qvcgja2lPhRDhHRlys=",
+      "dependencies": [
+        "arraybuffer-types",
+        "effect",
+        "exceptions",
+        "functions",
+        "maybe"
+      ]
+    },
     "catenable-lists": {
       "type": "registry",
       "version": "7.0.0",
@@ -1137,6 +1156,14 @@
         "refs",
         "safe-coerce",
         "unsafe-reference"
+      ]
+    },
+    "halogen-svg-elems": {
+      "type": "registry",
+      "version": "8.0.0",
+      "integrity": "sha256-NtZ30NoNyadVEsRcdY0zvm2yyahxUTgpioDNVz5gEIA=",
+      "dependencies": [
+        "halogen"
       ]
     },
     "halogen-vdom": {

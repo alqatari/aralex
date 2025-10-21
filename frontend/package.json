@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "description": "Quranic Phonosemantic Analysis System - Frontend",
   "scripts": {
-    "build": "spago build",
-    "bundle": "spago bundle-app --to dist/index.js",
-    "serve": "spago build --watch & parcel serve public/index.html"
+    "build": "./build.sh",
+    "dev": "./dev.sh",
+    "serve": "./dev.sh"
   },
   "keywords": [
     "purescript",

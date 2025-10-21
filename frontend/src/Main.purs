@@ -2,16 +2,14 @@ module Main where
 
 import Prelude
 
-import Data.Array (filter, length, null, groupBy, mapWithIndex, concat)
+import Data.Array (length, null, groupBy)
 import Data.Array as Array
 import Data.Array.NonEmpty (toArray, head)
 import Data.Either (Either(..))
-import Data.Foldable (any, all)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..))
 import Data.String as String
-import Data.String.CodeUnits (toCharArray, fromCharArray)
-import Data.String.Common (split)
+import Data.String.CodeUnits (toCharArray)
 import Data.String.Pattern (Pattern(..))
 import Data.Map (Map)
 import Data.Map as Map
@@ -22,10 +20,7 @@ import Effect.Aff (delay, Milliseconds(..))
 import Effect.Now (now)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import Data.DateTime (DateTime, time)
 import Data.DateTime.Instant (toDateTime)
-import Data.Time (hour, minute, second)
-import Data.Enum (fromEnum)
 import Affjax.Web as AX
 import Affjax.ResponseFormat as ResponseFormat
 import Data.Argonaut.Decode (decodeJson)
@@ -37,9 +32,14 @@ import Halogen.HTML.Properties as HP
 import Halogen.VDom.Driver (runUI)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, key)
 import Util.Clipboard (copyToClipboard)
+import Util.Arabic (removeTashkeel, filterArabicOnly, hasArabicChars, splitIntoTokens, TextToken(..))
+import Util.Time (formatTime)
+import Util.RootMatching (wordContainsRoot)
 import Domain.Dictionary (DictEntry(..), RootText(..))
 import Domain.Verse (VerseWithRoot(..), VerseRef(..))
 import Domain.Phonosemantics (WordAnalysis(..), LetterBreakdown(..), LetterMeaning(..), LetterCategory(..), LetterAttribute(..), PhonosemanticPattern(..), ArabicLetter(..), DictionaryEvidence(..), QuranicEvidence(..))
+import Component.EtymologyGraphSimple as EtymologyGraph
+import Type.Proxy (Proxy(..))
 
 type State =
   { searchQuery :: String
@@ -60,6 +60,7 @@ type State =
   , analysisError :: Map String String  -- Track analysis errors by word
   , analysisExpanded :: Boolean  -- Track if analysis panel is expanded
   , legendExpanded :: Boolean  -- Track if color legend is expanded
+  , showEtymologyGraph :: Boolean  -- Track if etymology graph modal is shown
   }
 
 data Action
@@ -84,6 +85,13 @@ data Action
   | AnalysisError String String  -- Handle analysis failure
   | ToggleAnalysis  -- Toggle analysis panel expansion
   | ToggleLegend  -- Toggle color legend expansion
+  | ToggleEtymologyGraph  -- Toggle etymology graph modal
+
+-- Slot type for child components
+type Slots = (etymologyGraph :: forall q. H.Slot q Void Unit)
+
+_etymologyGraph :: Proxy "etymologyGraph"
+_etymologyGraph = Proxy
 
 component :: forall q i o m. MonadAff m => H.Component q i o m
 component =
@@ -116,55 +124,12 @@ initialState _ =
   , analysisError: Map.empty  -- No errors initially
   , analysisExpanded: false  -- Analysis panel collapsed by default
   , legendExpanded: false  -- Color legend collapsed by default
+  , showEtymologyGraph: false  -- Graph modal hidden by default
   }
 
--- Helper: Format time as HH:MM:SS
-formatTime :: DateTime -> String
-formatTime dt =
-  let t = time dt
-      h = fromEnum $ hour t
-      m = fromEnum $ minute t
-      s = fromEnum $ second t
-      pad n = if n < 10 then "0" <> show n else show n
-  in pad h <> ":" <> pad m <> ":" <> pad s
+-- Utility functions imported from Util.* modules
 
--- Helper: Check if character is Arabic
-isArabicChar :: Char -> Boolean
-isArabicChar c =
-  let code = fromEnum c
-  in (code >= 0x0600 && code <= 0x06FF) || -- Arabic block
-     (code >= 0x0750 && code <= 0x077F) || -- Arabic Supplement
-     (code >= 0xFB50 && code <= 0xFDFF) || -- Arabic Presentation Forms-A
-     (code >= 0xFE70 && code <= 0xFEFF)    -- Arabic Presentation Forms-B
-
--- Helper: Check if character is a tashkeel (diacritic)
-isTashkeel :: Char -> Boolean
-isTashkeel c =
-  let code = fromEnum c
-  in code == 0x064B || -- Fathatan
-     code == 0x064C || -- Dammatan
-     code == 0x064D || -- Kasratan
-     code == 0x064E || -- Fatha
-     code == 0x064F || -- Damma
-     code == 0x0650 || -- Kasra
-     code == 0x0651 || -- Shadda
-     code == 0x0652 || -- Sukun
-     code == 0x0653 || -- Maddah
-     code == 0x0654 || -- Hamza above
-     code == 0x0655 || -- Hamza below
-     code == 0x0656 || -- Subscript alef
-     code == 0x0657 || -- Inverted damma
-     code == 0x0658 || -- Mark noon ghunna
-     code == 0x0670    -- Superscript alef
-
--- Helper: Remove tashkeel from text
-removeTashkeel :: String -> String
-removeTashkeel str =
-  let chars = toCharArray str
-      filtered = filter (not <<< isTashkeel) chars
-  in fromCharArray filtered
-
-handleAction :: forall o m. MonadAff m => Action -> H.HalogenM State Action () o m Unit
+handleAction :: forall o m. MonadAff m => Action -> H.HalogenM State Action Slots o m Unit
 handleAction = case _ of
   Initialize _ -> do
     -- Get current time and format it
@@ -329,6 +294,10 @@ handleAction = case _ of
     -- Toggle the color legend expansion
     H.modify_ \s -> s { legendExpanded = not s.legendExpanded }
 
+  ToggleEtymologyGraph -> do
+    -- Toggle the etymology graph modal
+    H.modify_ \s -> s { showEtymologyGraph = not s.showEtymologyGraph }
+
   PerformSearch -> do
     query <- H.gets _.searchQuery
     -- Only search if we have Arabic text
@@ -368,30 +337,6 @@ handleAction = case _ of
                       -- Automatically trigger phonosemantic analysis for the search query
                       handleAction (AnalyzeWord query)
 
--- Filter string to only contain Arabic letters, spaces, and diacritics
-filterArabicOnly :: String -> String
-filterArabicOnly str =
-  let chars = toCharArray str
-      filtered = filter isAllowedChar chars
-  in fromCharArray filtered
-  where
-    isAllowedChar c = isArabicChar c || c == ' '
-
--- Check if string has at least some Arabic characters
-hasArabicChars :: String -> Boolean
-hasArabicChars str =
-  let chars = toCharArray str
-  in any isArabicChar chars
-
--- Helper: Check if a word contains all root letters
-wordContainsRoot :: String -> String -> Boolean
-wordContainsRoot root word =
-  let rootChars = toCharArray (removeTashkeel root)
-      wordChars = toCharArray (removeTashkeel word)
-      -- Check if all root letters appear in the word
-      hasAllLetters = all (\rc -> any (_ == rc) wordChars) rootChars
-  in hasAllLetters
-
 -- Helper: Highlight words containing the root (preserves Arabic text shaping)
 -- Get phonosemantic color for a single Arabic letter
 getLetterPhonosemanticColor :: String -> String
@@ -417,7 +362,7 @@ getLetterPhonosemanticColor letter = case letter of
   _ -> "#667eea"
 
 -- Render a word with root letters highlighted (preserves Arabic cursive joining)
-renderWordWithLetterColors :: forall m. String -> Array Char -> H.ComponentHTML Action () m
+renderWordWithLetterColors :: forall m. String -> Array Char -> H.ComponentHTML Action Slots m
 renderWordWithLetterColors word rootLetters =
   -- Use a single bold style for all root letters to preserve text joining
   -- Coloring individual letters breaks Arabic contextual forms
@@ -425,27 +370,22 @@ renderWordWithLetterColors word rootLetters =
     [ HP.style "font-weight: 700; color: #e74c3c;" ]
     [ HH.text word ]
 
-highlightRootInText :: forall m. String -> String -> H.ComponentHTML Action () m
+highlightRootInText :: forall m. String -> String -> H.ComponentHTML Action Slots m
 highlightRootInText root text =
-  -- Split text by spaces
+  -- Split into tokens (Arabic words and non-Arabic text) to preserve formatting
   let rootLetters = toCharArray (removeTashkeel root)
-      words = split (Pattern " ") text
-      renderWord word =
-        if wordContainsRoot root word
-          then renderWordWithLetterColors (removeTashkeel word) rootLetters
-          else HH.text word
-      -- Add spaces between words, but not before the first one
-      renderedWithSpaces = mapWithIndex (\i word ->
-        if i == 0
-          then [renderWord word]
-          else [HH.text " ", renderWord word]
-      ) words
-      -- Flatten the array of arrays
-      rendered = concat renderedWithSpaces
-  in HH.span_ rendered
+      tokens = splitIntoTokens text
+      renderToken token = case token of
+        ArabicWord word ->
+          if wordContainsRoot word root
+            then renderWordWithLetterColors (removeTashkeel word) rootLetters
+            else HH.text word
+        NonArabic nonArabic ->
+          HH.text nonArabic
+  in HH.span_ (map renderToken tokens)
 
 -- Render Quranic verses containing the root, grouped by Surah
-renderVerses :: forall m. State -> Array VerseWithRoot -> H.ComponentHTML Action () m
+renderVerses :: forall m. State -> Array VerseWithRoot -> H.ComponentHTML Action Slots m
 renderVerses state verses =
   let
     -- Group verses by Surah number
@@ -526,7 +466,7 @@ renderVerses state verses =
       ) groups
 
     -- Render a Surah group with collapsible content
-    renderSurahGroup :: State -> Tuple Int (Array VerseWithRoot) -> H.ComponentHTML Action () m
+    renderSurahGroup :: State -> Tuple Int (Array VerseWithRoot) -> H.ComponentHTML Action Slots m
     renderSurahGroup st (Tuple surahNum surahVerses) =
       let
         isExpanded = Map.lookup surahNum st.expandedSurahs == Just true
@@ -568,7 +508,7 @@ renderVerses state verses =
         ]
 
     -- Render individual verse within a Surah group
-    renderVerse :: State -> VerseWithRoot -> H.ComponentHTML Action () m
+    renderVerse :: State -> VerseWithRoot -> H.ComponentHTML Action Slots m
     renderVerse st (VerseWithRoot verse) =
       let (VerseRef ref) = verse.vwrVerseRef
           verseKey = show ref.refSurah <> ":" <> show ref.refVerse
@@ -619,16 +559,9 @@ renderVerses state verses =
 
 -- Phonosemantic Analysis Rendering Functions
 
--- Helper: Get color based on confidence level
-confidenceColor :: Number -> String
-confidenceColor conf
-  | conf >= 0.7 = "#10b981"  -- Green for high confidence
-  | conf >= 0.5 = "#f59e0b"  -- Orange for medium confidence
-  | otherwise = "#ef4444"    -- Red for low confidence
-
 -- Main analysis panel
 -- Render the collapsible analysis panel (shows after search box, before results)
-renderAnalysisPanel :: forall m. State -> H.ComponentHTML Action () m
+renderAnalysisPanel :: forall m. State -> H.ComponentHTML Action Slots m
 renderAnalysisPanel state =
   -- Show analysis for the current search query (not cached old results)
   if state.searchQuery == ""
@@ -665,12 +598,8 @@ renderAnalysisPanel state =
                   -- Right: Buttons
                   , HH.div
                       [ HP.style "display: flex; align-items: center; gap: 12px;" ]
-                      [ -- Confidence badge
-                        HH.span
-                          [ HP.style $ "padding: 4px 12px; background: " <> confidenceColor analysis.analysisConfidence <> "; color: white; border-radius: 12px; font-size: 0.85rem; font-weight: bold;" ]
-                          [ HH.text $ "الثقة: " <> show (floor (analysis.analysisConfidence * 100.0)) <> "%" ]
-                      -- Copy button
-                      , HH.button
+                      [ -- Copy button
+                        HH.button
                           [ HP.type_ HP.ButtonButton
                           , HP.style "padding: 6px 12px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.9rem;"
                           , HE.onClick \_ -> CopyText "composite-meaning" analysis.compositeMeaning
@@ -695,19 +624,16 @@ renderAnalysisPanel state =
                   else HH.div_ []
               ]
 
-renderWordAnalysis :: forall m. State -> WordAnalysis -> H.ComponentHTML Action () m
+renderWordAnalysis :: forall m. State -> WordAnalysis -> H.ComponentHTML Action Slots m
 renderWordAnalysis state (WordAnalysis analysis) =
   HH.div
     [ HP.style "margin-top: 16px; padding: 16px; background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%); border-radius: 8px; border: 2px solid #667eea;" ]
     [ -- Header
       HH.div
-        [ HP.style "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #667eea;" ]
+        [ HP.style "margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #667eea;" ]
         [ HH.h4
             [ HP.style "margin: 0; color: #667eea; font-family: 'Lalezar', cursive; font-size: 1.3rem;" ]
             [ HH.text "التحليل الصوتي الدلالي" ]
-        , HH.span
-            [ HP.style $ "padding: 4px 12px; background: " <> confidenceColor analysis.analysisConfidence <> "; color: white; border-radius: 12px; font-size: 0.85rem; font-weight: bold;" ]
-            [ HH.text $ "الثقة: " <> show (floor (analysis.analysisConfidence * 100.0)) <> "%" ]
         ]
     -- Composite meaning
     , renderCompositeMeaning analysis.compositeMeaning
@@ -720,7 +646,7 @@ renderWordAnalysis state (WordAnalysis analysis) =
     ]
 
 -- Composite meaning display
-renderCompositeMeaning :: forall m. String -> H.ComponentHTML Action () m
+renderCompositeMeaning :: forall m. String -> H.ComponentHTML Action Slots m
 renderCompositeMeaning compositeMeaning =
   HH.div
     [ HP.style "margin-bottom: 16px; padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #764ba2;" ]
@@ -733,7 +659,7 @@ renderCompositeMeaning compositeMeaning =
     ]
 
 -- Letter breakdown table
-renderLetterBreakdown :: forall m. State -> Array LetterBreakdown -> H.ComponentHTML Action () m
+renderLetterBreakdown :: forall m. State -> Array LetterBreakdown -> H.ComponentHTML Action Slots m
 renderLetterBreakdown state letters =
   HH.div_
     [ -- Table (no title, no margin)
@@ -902,7 +828,7 @@ renderLetterBreakdown state letters =
           Pharyngeal -> "#7c3aed"  -- Vivid Purple for pharyngeals (ع، ح)
           Glottal -> "#dc2626"     -- Red for glottals (ء، ه)
 
-    renderLetterRow :: LetterBreakdown -> H.ComponentHTML Action () m
+    renderLetterRow :: LetterBreakdown -> H.ComponentHTML Action Slots m
     renderLetterRow (LetterBreakdown lb) =
       let bgColor = if lb.position `mod` 2 == 0 then "#fff0f0" else "#fffafa"  -- Light reddish alternating rows
           (ArabicLetter letterRec) = lb.letterChar
@@ -930,7 +856,7 @@ renderLetterBreakdown state letters =
       Glottal -> "حنجري"
 
 -- Pattern badges
-renderPatterns :: forall m. Array PhonosemanticPattern -> H.ComponentHTML Action () m
+renderPatterns :: forall m. Array PhonosemanticPattern -> H.ComponentHTML Action Slots m
 renderPatterns patterns =
   HH.div
     [ HP.style "margin-bottom: 16px;" ]
@@ -942,7 +868,7 @@ renderPatterns patterns =
         (map renderPattern patterns)
     ]
   where
-    renderPattern :: PhonosemanticPattern -> H.ComponentHTML Action () m
+    renderPattern :: PhonosemanticPattern -> H.ComponentHTML Action Slots m
     renderPattern (PhonosemanticPattern p) =
       HH.div
         [ HP.style "padding: 8px 12px; background: white; border: 2px solid #667eea; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" ]
@@ -955,9 +881,6 @@ renderPatterns patterns =
         , HH.div
             [ HP.style "font-size: 0.95rem; color: #333; direction: rtl; font-family: 'Aref Ruqaa', serif;" ]
             [ HH.text $ translateSemanticEffect p.semanticEffect ]
-        , HH.div
-            [ HP.style $ "margin-top: 4px; font-size: 0.8rem; color: " <> confidenceColor p.confidence ]
-            [ HH.text $ "الثقة: " <> show (floor (p.confidence * 100.0)) <> "%" ]
         ]
 
     showPatternName :: String -> String
@@ -984,7 +907,7 @@ renderPatterns patterns =
       else effect
 
 -- Dictionary evidence section
-renderDictionaryEvidence :: forall m. Array DictionaryEvidence -> H.ComponentHTML Action () m
+renderDictionaryEvidence :: forall m. Array DictionaryEvidence -> H.ComponentHTML Action Slots m
 renderDictionaryEvidence evidence =
   if Array.null evidence
     then HH.div_ []
@@ -998,7 +921,7 @@ renderDictionaryEvidence evidence =
           (map renderDictEvidence evidence)
       ]
   where
-    renderDictEvidence :: DictionaryEvidence -> H.ComponentHTML Action () m
+    renderDictEvidence :: DictionaryEvidence -> H.ComponentHTML Action Slots m
     renderDictEvidence (DictionaryEvidence ev) =
       let (RootText rootStr) = ev.dictRoot
       in HH.div
@@ -1012,7 +935,7 @@ renderDictionaryEvidence evidence =
         ]
 
 -- Quranic evidence section
-renderQuranicEvidence :: forall m. Array QuranicEvidence -> H.ComponentHTML Action () m
+renderQuranicEvidence :: forall m. Array QuranicEvidence -> H.ComponentHTML Action Slots m
 renderQuranicEvidence evidence =
   if Array.null evidence
     then HH.div_ []
@@ -1026,7 +949,7 @@ renderQuranicEvidence evidence =
           (map renderQuranicEv evidence)
       ]
   where
-    renderQuranicEv :: QuranicEvidence -> H.ComponentHTML Action () m
+    renderQuranicEv :: QuranicEvidence -> H.ComponentHTML Action Slots m
     renderQuranicEv (QuranicEvidence ev) =
       let (VerseRef ref) = ev.quranicVerseRef
       in HH.div
@@ -1040,7 +963,7 @@ renderQuranicEvidence evidence =
         ]
 
 -- Render dictionary results grouped by dictionary
-renderResults :: forall m. State -> Array DictEntry -> H.ComponentHTML Action () m
+renderResults :: forall m. State -> Array DictEntry -> H.ComponentHTML Action Slots m
 renderResults state entries =
   let grouped = groupByDict entries
   in HH.div
@@ -1113,7 +1036,7 @@ renderResults state entries =
             ) groups
 
     -- Render a dictionary group with collapsible content
-    renderDictGroup :: State -> Tuple String (Array DictEntry) -> H.ComponentHTML Action () m
+    renderDictGroup :: State -> Tuple String (Array DictEntry) -> H.ComponentHTML Action Slots m
     renderDictGroup st (Tuple dictName entries') =
       let isExpanded = Map.lookup dictName st.expandedDicts == Just true
       in HH.div
@@ -1141,12 +1064,12 @@ renderResults state entries =
             else HH.div_ []
         ]
 
-    renderEntry :: DictEntry -> H.ComponentHTML Action () m
+    renderEntry :: DictEntry -> H.ComponentHTML Action Slots m
     renderEntry (DictEntry entry) =
       -- Since there's only one entry per dictionary for a root, we can use just the dictionary source as key
       let entryKey = "dict-" <> entry.dictionarySource
-          -- Unwrap RootText to get the String
-          (RootText rootRec) = entry.root
+          -- Unwrap RootText to get the String - use normalized root for consistent matching
+          (RootText rootRec) = entry.rootNormalized
           rootStr = rootRec.unRoot
           tashkeelHidden = Map.lookup entryKey state.hiddenTashkeel == Just true
           wasCopied = state.copiedItem == Just entryKey
@@ -1178,7 +1101,48 @@ renderResults state entries =
             [ highlightRootInText rootStr displayText ]
         ]
 
-render :: forall m. State -> H.ComponentHTML Action () m
+-- Etymology Graph Panel (Collapsible Inline)
+renderEtymologyPanel :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
+renderEtymologyPanel state =
+  -- Only show etymology panel if we have an analysis with a root for the current search query
+  let
+    currentAnalysis = Map.lookup state.searchQuery state.wordAnalysis
+    maybeRoot = currentAnalysis >>= (\(WordAnalysis analysis) -> analysis.analysisRoot)
+  in
+    case maybeRoot of
+      Nothing -> HH.div_ []  -- No analysis or no root yet, don't show panel
+      Just (RootText rootRec) ->
+        HH.div
+          [ HP.style "margin: 0 auto 20px auto; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2); overflow: hidden;" ]
+          [ -- Header with toggle
+            HH.div
+              [ HP.style "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+              , HE.onClick \_ -> ToggleEtymologyGraph
+              ]
+              [ -- Left: Collapse/expand button
+                HH.button
+                  [ HP.type_ HP.ButtonButton
+                  , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 1.2rem; margin-left: 12px;"
+                  , HE.onClick \_ -> ToggleEtymologyGraph
+                  ]
+                  [ HH.text $ if state.showEtymologyGraph then "▼" else "◀" ]
+              -- Middle: Title (clickable to collapse/expand)
+              , HH.h3
+                  [ HP.style "margin: 0; color: white; font-family: 'Lalezar', cursive; font-size: 1.4rem; direction: rtl; flex: 1; display: flex; align-items: center; gap: 8px;"
+                  ]
+                  [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 24px;" ] [ HH.text "account_tree" ]
+                  , HH.text "شبكة العلاقات الاشتقاقية"
+                  ]
+              ]
+          -- Expandable Graph Content
+          , if state.showEtymologyGraph
+              then HH.div
+                  [ HP.style "background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); padding: 20px; min-height: 600px;" ]
+                  [ HH.slot _etymologyGraph unit EtymologyGraph.component rootRec.unRoot absurd ]
+              else HH.div_ []
+          ]
+
+render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
 render state =
   HH.div
     [ HP.class_ (HH.ClassName "app-container") ]
@@ -1235,6 +1199,9 @@ render state =
         -- Phonosemantic Analysis Panel (collapsible, appears after search)
         , renderAnalysisPanel state
 
+        -- Etymology Graph Panel (collapsible, inline)
+        , renderEtymologyPanel state
+
         -- Show results
         , if state.isSearching
             then HH.div
@@ -1263,6 +1230,7 @@ render state =
             ]
             [ HH.text "+966_5665_7_4248" ]
         ]
+
     ]
 
 main :: Effect Unit

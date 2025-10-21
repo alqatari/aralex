@@ -28,5 +28,5 @@ package:
     - refs
 
 workspace:
-  packageSet:
+  package_set:
     registry: "50.0.0"

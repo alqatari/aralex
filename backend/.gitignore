@@ -1,0 +1,28 @@
+# Cabal build artifacts
+dist/
+dist-newstyle/
+cabal.project.local
+cabal.project.local~
+
+# GHC
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+.ghc.environment.*
+
+# Stack (if used)
+.stack-work/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3

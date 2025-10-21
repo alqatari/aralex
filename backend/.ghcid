@@ -1,0 +1,2 @@
+--restart=aralex-backend.cabal
+--warnings

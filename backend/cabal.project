@@ -1,0 +1,9 @@
+packages: .
+
+with-compiler: ghc-9.12.2
+
+package aralex-backend
+  ghc-options: -Wall -O2
+
+tests: True
+benchmarks: False
