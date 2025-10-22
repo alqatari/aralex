@@ -468,6 +468,8 @@ renderVerses state verses =
           Nothing -> VerseWithRoot { vwrVerseRef: VerseRef { refSurah: 0, refVerse: 0 }, vwrText: "", vwrRoot: "", vwrSurahName: "", vwrOccurrences: 0, vwrWordIndices: [] }
         surahName = firstVerse.vwrSurahName
         verseCount = Array.length surahVerses
+        -- Calculate total occurrences in this Surah
+        surahOccurrences = Array.foldl (\acc (VerseWithRoot v) -> acc + v.vwrOccurrences) 0 surahVerses
       in HH.div
         [ HP.style "margin-bottom: 16px; border: 2px solid #e5e7eb; border-radius: 8px; overflow: hidden; background: white;" ]
         [ -- Surah header (clickable to expand/collapse)
@@ -489,7 +491,7 @@ renderVerses state verses =
                 ]
             , HH.span
                 [ HP.style "background: #e5e7eb; color: #374151; padding: 4px 12px; border-radius: 12px; font-size: 0.9rem; font-weight: bold;" ]
-                [ HH.text $ show verseCount <> " آية" ]
+                [ HH.text $ show surahOccurrences <> " مرة في " <> show verseCount <> " آية" ]
             ]
         -- Verses within this Surah (only shown when expanded)
         , if isExpanded

@@ -73,33 +73,34 @@ parseFeatures = feature `sepBy` char '|'
       -- Participles
       <|> (string "ACT_PCPL" *> pure ActiveParticiple)
       <|> (string "PASS_PCPL" *> pure PassiveParticiple)
-      -- Noun type
-      <|> (string "PN" *> pure ProperNoun)
+      -- Particle types (MUST come before single-letter Number/Gender/Preposition)
+      <|> (string "DET" *> pure Determiner)
+      <|> (string "CONJ" *> pure Conjunction)
+      <|> (string "NEG" *> pure Negation)
+      <|> (string "REL" *> pure RelativePronoun)
+      <|> (string "EXP" *> pure Exceptive)
+      -- Definiteness (DEF must come before D for Dual)
+      <|> (string "DEF" *> pure (Definiteness Domain.Morphology.Definite))
+      <|> (string "INDEF" *> pure (Definiteness Indefinite))
+      -- Noun type (PN/PRON must come before P for Plural/Preposition)
       <|> (string "PRON" *> pure Pronoun)
+      <|> (string "PN" *> pure ProperNoun)
       <|> (string "ADJ" *> pure Adjective)
-      -- Case
+      -- Case (NOM must come before N for Noun in parsePOSTag)
       <|> (string "NOM" *> pure (Case Nominative))
       <|> (string "ACC" *> pure (Case Accusative))
       <|> (string "GEN" *> pure (Case Genitive))
-      -- Number
+      -- Number (after DET/DEF/INDEF to avoid D conflict)
       <|> (string "S" *> pure (Number Singular))
       <|> (string "D" *> pure (Number Dual))
       <|> (string "P" *> pure (Number Plural))
       -- Gender
       <|> (string "M" *> pure (Gender Masculine))
       <|> (string "F" *> pure (Gender Feminine))
-      -- Definiteness
-      <|> (string "INDEF" *> pure (Definiteness Indefinite))
-      <|> (string "DEF" *> pure (Definiteness Domain.Morphology.Definite))
-      -- Particle types
-      <|> (string "DET" *> pure Determiner)
-      <|> (string "CONJ" *> pure Conjunction)
-      <|> (string "NEG" *> pure Negation)
-      <|> (string "P" *> pure Preposition)
-      <|> (string "REL" *> pure RelativePronoun)
-      <|> (string "EXP" *> pure Exceptive)
-      -- Person/Gender/Number
+      -- Person/Gender/Number (must come before single P)
       <|> parsePGN
+      -- Preposition (single P - must come LAST after all P-prefixed features)
+      <|> (string "P" *> pure Preposition)
       -- Fallback for unknown features (ignore)
       <|> (A.takeWhile1 (/= '|') *> fail "Unknown feature")
 

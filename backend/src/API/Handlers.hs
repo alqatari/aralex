@@ -46,6 +46,17 @@ import Domain.Phonosemantics
   , getArticulationPoint
   )
 
+-- | Normalize letter for database lookup
+-- Converts all hamza forms to standalone ء
+normalizeLetter :: Text -> Text
+normalizeLetter t = case T.unpack t of
+  ['أ'] -> "ء"  -- hamza on alif
+  ['إ'] -> "ء"  -- hamza under alif
+  ['آ'] -> "ء"  -- hamza madda
+  ['ؤ'] -> "ء"  -- hamza on waw
+  ['ئ'] -> "ء"  -- hamza on ya
+  _     -> t    -- keep other letters as-is
+
 -- | Look up dictionary entries by root
 lookupRoot :: Connection -> RootText -> IO [DictEntry]
 lookupRoot conn (RootText rootText) = do
@@ -185,10 +196,13 @@ findWordRoot conn word = do
 -- | Build letter breakdown with meaning from database
 buildLetterBreakdown :: Connection -> (Int, ArabicLetter) -> IO LetterBreakdown
 buildLetterBreakdown conn (pos, letter@(ArabicLetter letterText)) = do
+  -- Normalize letter for database lookup (all hamza forms → ء)
+  let normalizedLetter = normalizeLetter letterText
+
   -- Query letter meaning from database
   meaningResult <- query conn
     "SELECT primary_meaning_ar, primary_meaning_en, semantic_domains, examples FROM letter_meanings WHERE letter = ?"
-    (Only letterText) :: IO [(Text, Maybe Text, Text, Text)]
+    (Only normalizedLetter) :: IO [(Text, Maybe Text, Text, Text)]
 
   let meaning = case meaningResult of
         ((primaryAr, primaryEn, _domains, examplesJson):_) -> Just $ LetterMeaning
