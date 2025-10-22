@@ -273,9 +273,9 @@ detectEmphatics letters =
   let emphaticLetters = filter isEmphatic letters
   in if not (null emphaticLetters)
      then [PhonosemanticPattern
-            { patternName = "intensification"
+            { patternName = "التفخيم"
             , letterSequence = emphaticLetters
-            , semanticEffect = "The emphatic consonants (ط، ض، ص، ظ) add intensity and strength to the word's meaning"
+            , semanticEffect = "الحروف المفخمة (ط، ض، ص، ظ) تضيف قوة وشدة لمعنى الكلمة"
             , confidence = 0.9
             }]
      else []
@@ -288,9 +288,9 @@ detectGutturals letters =
   let gutturalLetters = filter isGuttural letters
   in if length gutturalLetters >= 2
      then [PhonosemanticPattern
-            { patternName = "depth"
+            { patternName = "العمق"
             , letterSequence = gutturalLetters
-            , semanticEffect = "Multiple guttural letters (ء، ه، ع، ح، غ، خ) suggest depth, profundity, or metaphysical concepts"
+            , semanticEffect = "الحروف الحلقية (ء، ه، ع، ح، غ، خ) توحي بالعمق والباطنية والمفاهيم الروحية"
             , confidence = 0.8
             }]
      else []
@@ -303,9 +303,9 @@ detectLabials letters =
   let labialLetters = filter isLabial letters
   in if length labialLetters >= 2
      then [PhonosemanticPattern
-            { patternName = "containment"
+            { patternName = "الاحتواء"
             , letterSequence = labialLetters
-            , semanticEffect = "Labial letters (ب، م، و، ف) suggest enclosure, gathering, or containment"
+            , semanticEffect = "الحروف الشفوية (ب، م، و، ف) توحي بالجمع والاحتواء والضم"
             , confidence = 0.75
             }]
      else []
@@ -317,9 +317,9 @@ detectMovement :: [ArabicLetter] -> [PhonosemanticPattern]
 detectMovement letters =
   if any isRa letters
   then [PhonosemanticPattern
-         { patternName = "movement"
+         { patternName = "الحركة"
          , letterSequence = filter isRa letters
-         , semanticEffect = "The letter ر indicates vibration, repetition, or movement"
+         , semanticEffect = "حرف الراء يدل على الاهتزاز والتكرار والحركة"
          , confidence = 0.85
          }]
   else []
@@ -331,9 +331,9 @@ detectOpening :: [ArabicLetter] -> [PhonosemanticPattern]
 detectOpening letters =
   if any isFa letters
   then [PhonosemanticPattern
-         { patternName = "opening"
+         { patternName = "الفتح"
          , letterSequence = filter isFa letters
-         , semanticEffect = "The letter ف indicates opening, separation, or revelation"
+         , semanticEffect = "حرف الفاء يدل على الفتح والانفصال والكشف"
          , confidence = 0.85
          }]
   else []
