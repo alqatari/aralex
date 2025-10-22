@@ -246,9 +246,9 @@ handleAction = case _ of
         -- Start analyzing
         H.modify_ _ { analyzingWord = Just word, analysisError = Map.delete word state.analysisError }
         -- Make API call
-        liftEffect $ log $ "Making API call to: http://localhost:8080/api/v1/analyze/" <> word
+        liftEffect $ log $ "Making API call to: /api/v1/analyze/" <> word
         response <- liftAff $ AX.get ResponseFormat.json
-          ("http://localhost:8080/api/v1/analyze/" <> word)
+          ("/api/v1/analyze/" <> word)
         case response of
           Left err -> do
             -- Network or HTTP error
@@ -302,14 +302,25 @@ handleAction = case _ of
     query <- H.gets _.searchQuery
     -- Only search if we have Arabic text
     when (query /= "" && hasArabicChars query) do
-      H.modify_ _ { isSearching = true, error = Nothing, results = [], verses = [] }
+      H.modify_ _
+        { isSearching = true
+        , error = Nothing
+        , results = []
+        , verses = []
+        -- Collapse all sections except analysis panel on new search
+        , quranSectionExpanded = false
+        , dictsSectionExpanded = false
+        , analysisExpanded = true  -- Keep analysis panel expanded
+        , legendExpanded = false
+        , showEtymologyGraph = false
+        }
 
       -- Make API calls in parallel (verses and dictionary)
       versesResponse <- H.liftAff $ AX.get ResponseFormat.json
-        ("http://localhost:8080/api/v1/verses/" <> query)
+        ("/api/v1/verses/" <> query)
 
       dictResponse <- H.liftAff $ AX.get ResponseFormat.json
-        ("http://localhost:8080/api/v1/dictionary/" <> query)
+        ("/api/v1/dictionary/" <> query)
 
       -- Process verses response
       case versesResponse of
@@ -364,8 +375,11 @@ getLetterPhonosemanticColor letter = case letter of
 -- Render a word with root letters highlighted (preserves Arabic cursive joining)
 renderWordWithLetterColors :: forall m. String -> Array Char -> H.ComponentHTML Action Slots m
 renderWordWithLetterColors word rootLetters =
-  -- Use a single bold style for all root letters to preserve text joining
-  -- Coloring individual letters breaks Arabic contextual forms
+  -- NOTE: We cannot color individual letters because wrapping each letter in HTML <span>
+  -- tags breaks Arabic contextual letter forms (cursive joining). Arabic letters change
+  -- shape based on position (initial, medial, final, isolated), and separating them with
+  -- HTML tags forces them into isolated forms, breaking the natural cursive flow.
+  -- Therefore, we use a single bold red style for the entire word containing root letters.
   HH.span
     [ HP.style "font-weight: 700; color: #e74c3c;" ]
     [ HH.text word ]
@@ -390,6 +404,8 @@ renderVerses state verses =
   let
     -- Group verses by Surah number
     surahGroups = groupBySurah verses
+    -- Calculate total occurrences across all verses
+    totalOccurrences = Array.foldl (\acc (VerseWithRoot v) -> acc + v.vwrOccurrences) 0 verses
   in
     HH.div
       [ HP.style "margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto;" ]
@@ -412,34 +428,10 @@ renderVerses state verses =
                   [ HP.style "margin: 0; font-family: 'Lalezar', cursive; font-size: 1.4rem;" ]
                   [ HH.text "الآيات القرآنية" ]
               ]
-          -- Middle: Count badge
+          -- Right side: Count badge (showing occurrences, verses, and surahs)
           , HH.span
-              [ HP.style "background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 16px; font-weight: bold; margin: 0 12px;" ]
-              [ HH.text $ show (length verses) <> " آية في " <> show (Array.length surahGroups) <> " سورة" ]
-          -- Right side: Action buttons
-          , HH.div
-              [ HP.style "display: flex; gap: 8px;" ]
-              [ -- Expand all button
-                HH.button
-                  [ HP.type_ HP.ButtonButton
-                  , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;"
-                  , HP.title "توسيع الكل"
-                  , HE.onClick \_ -> ExpandAllSurahs
-                  ]
-                  [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 18px;" ] [ HH.text "unfold_more" ]
-                  , HH.text "توسيع"
-                  ]
-              -- Collapse all button
-              , HH.button
-                  [ HP.type_ HP.ButtonButton
-                  , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;"
-                  , HP.title "طي الكل"
-                  , HE.onClick \_ -> CollapseAllSurahs
-                  ]
-                  [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 18px;" ] [ HH.text "unfold_less" ]
-                  , HH.text "طي"
-                  ]
-              ]
+              [ HP.style "background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 16px; font-weight: bold;" ]
+              [ HH.text $ show totalOccurrences <> " مرة في " <> show (length verses) <> " آية في " <> show (Array.length surahGroups) <> " سورة" ]
           ]
       -- Surah groups (only shown when section is expanded)
       , if state.quranSectionExpanded
@@ -987,34 +979,10 @@ renderResults state entries =
                 [ HP.style "margin: 0; font-family: 'Lalezar', cursive; font-size: 1.4rem;" ]
                 [ HH.text "المعاجم العربية" ]
             ]
-        -- Middle: Count badge
+        -- Right side: Count badge
         , HH.span
-            [ HP.style "background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 16px; font-weight: bold; margin: 0 12px;" ]
+            [ HP.style "background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 16px; font-weight: bold;" ]
             [ HH.text $ show (length entries) <> " مدخل في " <> show (length grouped) <> " معجم" ]
-        -- Right side: Action buttons
-        , HH.div
-            [ HP.style "display: flex; gap: 8px;" ]
-            [ -- Expand all button
-              HH.button
-                [ HP.type_ HP.ButtonButton
-                , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;"
-                , HP.title "توسيع الكل"
-                , HE.onClick \_ -> ExpandAllDicts
-                ]
-                [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 18px;" ] [ HH.text "unfold_more" ]
-                , HH.text "توسيع"
-                ]
-            -- Collapse all button
-            , HH.button
-                [ HP.type_ HP.ButtonButton
-                , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.85rem;"
-                , HP.title "طي الكل"
-                , HE.onClick \_ -> CollapseAllDicts
-                ]
-                [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 18px;" ] [ HH.text "unfold_less" ]
-                , HH.text "طي"
-                ]
-            ]
         ]
     -- Dictionary groups (only shown when section is expanded)
     , if state.dictsSectionExpanded
@@ -1131,7 +1099,8 @@ renderEtymologyPanel state =
                   [ HP.style "margin: 0; color: white; font-family: 'Lalezar', cursive; font-size: 1.4rem; direction: rtl; flex: 1; display: flex; align-items: center; gap: 8px;"
                   ]
                   [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 24px;" ] [ HH.text "account_tree" ]
-                  , HH.text "شبكة العلاقات الاشتقاقية"
+                  , HH.text "شبكة العلاقات الاشتقاقية "
+                  , HH.span [ HP.style "font-size: 0.9rem; opacity: 0.8;" ] [ HH.text "(Experimental)" ]
                   ]
               ]
           -- Expandable Graph Content
