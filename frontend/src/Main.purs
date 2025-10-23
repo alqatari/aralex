@@ -425,7 +425,7 @@ renderVerses state verses =
                   ]
                   [ HH.text $ if state.quranSectionExpanded then "▼" else "◀" ]
               , HH.h3
-                  [ HP.style "margin: 0; font-family: 'Lalezar', cursive; font-size: 1.4rem;" ]
+                  [ HP.style "margin: 0; font-family: 'RB Regular', sans-serif; font-size: 1.4rem;" ]
                   [ HH.text "الآيات القرآنية" ]
               ]
           -- Right side: Count badge (showing occurrences, verses, and surahs)
@@ -486,7 +486,7 @@ renderVerses state verses =
                     ]
                     [ HH.text $ if isExpanded then "▼" else "◀" ]
                 , HH.span
-                    [ HP.style "font-family: 'Lalezar', cursive; font-size: 1.2rem;" ]
+                    [ HP.style "font-family: 'RB Regular', sans-serif; font-size: 1.2rem;" ]
                     [ HH.text $ "سورة " <> surahName ]
                 ]
             , HH.span
@@ -530,19 +530,29 @@ renderVerses state verses =
                 [ -- Copy button
                   HH.button
                     [ HP.type_ HP.ButtonButton
-                    , HP.style "padding: 4px 8px; font-size: 0.85rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                    , HP.style "padding: 6px 10px; font-size: 1.2rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px;"
                     , HP.title "نسخ النص"
                     , HE.onClick \_ -> CopyText ("verse-" <> verseKey) verse.vwrText
                     ]
-                    [ HH.text $ if wasCopied then "✓ تم النسخ" else "نسخ" ]
+                    [ HH.i
+                        [ HP.class_ (HH.ClassName "material-icons")
+                        , HP.style "font-size: 18px;"
+                        ]
+                        [ HH.text $ if wasCopied then "check" else "content_copy" ]
+                    ]
                 -- Tashkeel toggle button
                 , HH.button
                     [ HP.type_ HP.ButtonButton
-                    , HP.style "padding: 4px 8px; font-size: 0.85rem; background: #764ba2; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                    , HP.style "padding: 6px 10px; font-size: 1.2rem; background: #764ba2; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px;"
                     , HP.title "إخفاء/إظهار التشكيل"
                     , HE.onClick \_ -> ToggleTashkeel ("verse-" <> verseKey)
                     ]
-                    [ HH.text $ if tashkeelHidden then "إظهار التشكيل" else "إخفاء التشكيل" ]
+                    [ HH.i
+                        [ HP.class_ (HH.ClassName "material-icons")
+                        , HP.style "font-size: 18px;"
+                        ]
+                        [ HH.text "format_size" ]
+                    ]
                 ]
             ]
         -- Verse text (always visible)
@@ -585,7 +595,7 @@ renderAnalysisPanel state =
                       [ HH.text $ if state.analysisExpanded then "▼" else "◀" ]
                   -- Middle: Composite meaning (clickable to collapse/expand)
                   , HH.h3
-                      [ HP.style "margin: 0; color: white; font-family: 'Lalezar', cursive; font-size: 1.4rem; direction: rtl; flex: 1; cursor: pointer; user-select: none;"
+                      [ HP.style "margin: 0; color: white; font-family: 'RB Regular', sans-serif; font-size: 1.4rem; direction: rtl; flex: 1; cursor: pointer; user-select: none;"
                       , HE.onClick \_ -> ToggleAnalysis
                       ]
                       [ HH.text analysis.compositeMeaning ]
@@ -626,7 +636,7 @@ renderWordAnalysis state (WordAnalysis analysis) =
       HH.div
         [ HP.style "margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #667eea;" ]
         [ HH.h4
-            [ HP.style "margin: 0; color: #667eea; font-family: 'Lalezar', cursive; font-size: 1.3rem;" ]
+            [ HP.style "margin: 0; color: #667eea; font-family: 'Effra Regular', sans-serif; font-size: 1.3rem;" ]
             [ HH.text "التحليل الصوتي الدلالي" ]
         ]
     -- Composite meaning
@@ -645,10 +655,10 @@ renderCompositeMeaning compositeMeaning =
   HH.div
     [ HP.style "margin-bottom: 16px; padding: 12px; background: white; border-radius: 6px; border-left: 4px solid #764ba2;" ]
     [ HH.h5
-        [ HP.style "margin: 0 0 8px 0; color: #764ba2; font-family: 'Lalezar', cursive; font-size: 1.1rem;" ]
+        [ HP.style "margin: 0 0 8px 0; color: #764ba2; font-family: 'Effra Regular', sans-serif; font-size: 1.1rem;" ]
         [ HH.text "المعنى المركب" ]
     , HH.p
-        [ HP.style "margin: 0; font-family: 'Scheherazade New', serif; font-size: 1.1rem; line-height: 1.8; color: #333; direction: rtl;" ]
+        [ HP.style "margin: 0; font-family: 'Effra Regular', sans-serif; font-size: 1.1rem; line-height: 1.8; color: #333; direction: rtl;" ]
         [ HH.text compositeMeaning ]
     ]
 
@@ -662,9 +672,9 @@ renderLetterBreakdown state letters =
         [ HH.thead_
             [ HH.tr
                 [ HP.style "background: linear-gradient(135deg, #f87171 0%, #dc2626 100%); color: white;" ]
-                [ HH.th [ HP.style "padding: 12px; text-align: center; font-family: 'Aref Ruqaa', serif; font-size: 1.3rem; width: 15%;" ] [ HH.text "الحرف" ]
-                , HH.th [ HP.style "padding: 12px; text-align: center; font-family: 'Aref Ruqaa', serif; font-size: 1.2rem; width: 25%;" ] [ HH.text "التصنيف" ]
-                , HH.th [ HP.style "padding: 12px 20px; text-align: right; font-family: 'Aref Ruqaa', serif; font-size: 1.2rem; direction: rtl; width: 60%;" ] [ HH.text "المعنى" ]
+                [ HH.th [ HP.style "padding: 12px; text-align: center; font-family: 'Effra Regular', sans-serif; font-size: 1.3rem; width: 15%;" ] [ HH.text "الحرف" ]
+                , HH.th [ HP.style "padding: 12px; text-align: center; font-family: 'Effra Regular', sans-serif; font-size: 1.2rem; width: 25%;" ] [ HH.text "التصنيف" ]
+                , HH.th [ HP.style "padding: 12px 20px; text-align: right; font-family: 'Effra Regular', sans-serif; font-size: 1.2rem; direction: rtl; width: 60%;" ] [ HH.text "المعنى" ]
                 ]
             ]
         , HH.tbody_
@@ -685,43 +695,43 @@ renderLetterBreakdown state letters =
                 ]
                 [ HH.text $ if state.legendExpanded then "▼" else "◀" ]
             , HH.span
-                [ HP.style "font-family: 'Aref Ruqaa', serif; font-size: 1.1rem; font-weight: 600; color: #374151;" ]
+                [ HP.style "font-family: 'Effra Regular', sans-serif; font-size: 1.1rem; font-weight: 600; color: #374151;" ]
                 [ HH.text "دليل الألوان" ]
             ] <> if not state.legendExpanded
                   then -- Compact legend items when collapsed
-                    [ HH.span [ HP.style "display: flex; align-items: center; gap: 4px; margin-right: 8px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    [ HH.span [ HP.style "display: flex; align-items: center; gap: 4px; margin-right: 8px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #dc2626; border-radius: 2px;" ] []
                         , HH.text "حنجرية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #7c3aed; border-radius: 2px;" ] []
                         , HH.text "حلقية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #db2777; border-radius: 2px;" ] []
                         , HH.text "لهوية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #0891b2; border-radius: 2px;" ] []
                         , HH.text "طبقية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #d97706; border-radius: 2px;" ] []
                         , HH.text "حنكية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #059669; border-radius: 2px;" ] []
                         , HH.text "لثوية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #92400e; border-radius: 2px;" ] []
                         , HH.text "أسنانية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #2563eb; border-radius: 2px;" ] []
                         , HH.text "شفوية"
                         ]
-                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Aref Ruqaa', serif; font-size: 0.9rem;" ]
+                    , HH.span [ HP.style "display: flex; align-items: center; gap: 4px; font-family: 'Effra Regular', sans-serif; font-size: 0.9rem;" ]
                         [ HH.span [ HP.style "width: 14px; height: 14px; background: #f97316; border-radius: 2px;" ] []
                         , HH.text "إطباقية"
                         ]
@@ -731,69 +741,69 @@ renderLetterBreakdown state letters =
         -- Legend content (shown only when expanded) - 3 columns: color, name+letters, definition
         , if state.legendExpanded
             then HH.div
-              [ HP.style "padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; direction: rtl; font-family: 'Aref Ruqaa', serif;" ]
+              [ HP.style "padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; direction: rtl; font-family: 'Effra Regular', sans-serif;" ]
               [ -- Glottal (back of throat)
                 HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #dc2626; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "حنجرية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ء، هـ، غ، خ" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من الحنجرة (الحلق الأسفل)" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من الحنجرة (الحلق الأسفل)" ]
                   ]
               -- Pharyngeal
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #7c3aed; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "حلقية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ع، ح" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من الحلق (الوسط والأعلى)" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من الحلق (الوسط والأعلى)" ]
                   ]
               -- Uvular
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #db2777; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "لهوية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ق" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الصوت الذي يخرج من اللهاة وأقصى اللسان" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الصوت الذي يخرج من اللهاة وأقصى اللسان" ]
                   ]
               -- Velar
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #0891b2; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "طبقية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ك" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الصوت الذي يخرج من الطبق (أقصى الحنك اللين)" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الصوت الذي يخرج من الطبق (أقصى الحنك اللين)" ]
                   ]
               -- Palatal
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #d97706; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "حنكية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ج، ش، ي" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من وسط الحنك واللسان" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من وسط الحنك واللسان" ]
                   ]
               -- Alveolar
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #059669; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "لثوية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ت، د، ن، ل، ر، ز، س" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من اللثة وطرف اللسان" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من اللثة وطرف اللسان" ]
                   ]
               -- Dental
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #92400e; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "أسنانية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ث، ذ، ظ" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من الأسنان واللسان" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من الأسنان واللسان" ]
                   ]
               -- Labial (front)
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #2563eb; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "شفوية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ب، م، و، ف" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات التي تخرج من الشفتين أو بمساعدتهما" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات التي تخرج من الشفتين أو بمساعدتهما" ]
                   ]
               -- Emphatic (special feature)
               , HH.div [ HP.style "display: flex; align-items: center; gap: 12px;" ]
                   [ HH.span [ HP.style "width: 20px; height: 20px; background: #f97316; border-radius: 3px; flex-shrink: 0;" ] []
                   , HH.span [ HP.style "font-weight: 600; min-width: 90px;" ] [ HH.text "إطباقية:" ]
                   , HH.span [ HP.style "font-size: 1.2rem; min-width: 150px;" ] [ HH.text "ط، ض، ص، ظ" ]
-                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Aref Ruqaa', serif;" ] [ HH.text "الأصوات المفخمة التي يرتفع فيها أقصى اللسان نحو الحنك" ]
+                  , HH.span [ HP.style "color: #6b7280; font-size: 0.95rem; font-family: 'Effra Regular', sans-serif;" ] [ HH.text "الأصوات المفخمة التي يرتفع فيها أقصى اللسان نحو الحنك" ]
                   ]
               ]
             else HH.div_ []
@@ -829,9 +839,9 @@ renderLetterBreakdown state letters =
           letterColor = getLetterColor lb.attributes lb.category
       in HH.tr
         [ HP.style ("background: " <> bgColor <> "; border-bottom: 1px solid #e5e7eb;") ]
-        [ HH.td [ HP.style ("padding: 12px; text-align: center; font-family: 'Aref Ruqaa', serif; font-size: 2rem; font-weight: bold; color: " <> letterColor <> " !important;") ] [ HH.text letterRec.unLetter ]
-        , HH.td [ HP.style ("padding: 12px; text-align: center; font-family: 'Aref Ruqaa', serif; font-size: 1.3rem; font-weight: 600; color: " <> letterColor <> ";") ] [ HH.text $ showCategory lb.category ]
-        , HH.td [ HP.style "padding: 12px 20px; text-align: right; font-family: 'Aref Ruqaa', serif; font-size: 1.2rem; direction: rtl; color: #333; line-height: 1.8;" ]
+        [ HH.td [ HP.style ("padding: 12px; text-align: center; font-family: 'Effra Regular', sans-serif; font-size: 2rem; font-weight: bold; color: " <> letterColor <> " !important;") ] [ HH.text letterRec.unLetter ]
+        , HH.td [ HP.style ("padding: 12px; text-align: center; font-family: 'Effra Regular', sans-serif; font-size: 1.3rem; font-weight: 600; color: " <> letterColor <> ";") ] [ HH.text $ showCategory lb.category ]
+        , HH.td [ HP.style "padding: 12px 20px; text-align: right; font-family: 'Effra Regular', sans-serif; font-size: 1.2rem; direction: rtl; color: #333; line-height: 1.8;" ]
             [ case lb.meaning of
                 Just (LetterMeaning m) -> HH.text m.primaryMeaning
                 Nothing -> HH.span [ HP.style "color: #9ca3af; font-style: italic;" ] [ HH.text "لا يوجد معنى" ]
@@ -855,7 +865,7 @@ renderPatterns patterns =
   HH.div
     [ HP.style "margin-bottom: 16px;" ]
     [ HH.h5
-        [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Lalezar', cursive; font-size: 1.1rem;" ]
+        [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Effra Regular', sans-serif; font-size: 1.1rem;" ]
         [ HH.text "الأنماط الصوتية المكتشفة" ]
     , HH.div
         [ HP.style "display: flex; flex-wrap: wrap; gap: 8px;" ]
@@ -867,13 +877,13 @@ renderPatterns patterns =
       HH.div
         [ HP.style "padding: 8px 12px; background: white; border: 2px solid #667eea; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" ]
         [ HH.div
-            [ HP.style "font-family: 'Lalezar', cursive; color: #667eea; font-size: 1rem; margin-bottom: 4px;" ]
+            [ HP.style "font-family: 'Effra Regular', sans-serif; color: #667eea; font-size: 1rem; margin-bottom: 4px;" ]
             [ HH.text $ showPatternName p.patternName ]
         , HH.div
             [ HP.style "font-size: 0.85rem; color: #6b7280; margin-bottom: 4px;" ]
             [ HH.text $ "الحروف: " <> String.joinWith "، " (map (\(ArabicLetter l) -> l.unLetter) p.letterSequence) ]
         , HH.div
-            [ HP.style "font-size: 0.95rem; color: #333; direction: rtl; font-family: 'Aref Ruqaa', serif;" ]
+            [ HP.style "font-size: 0.95rem; color: #333; direction: rtl; font-family: 'Effra Regular', sans-serif;" ]
             [ HH.text $ translateSemanticEffect p.semanticEffect ]
         ]
 
@@ -908,7 +918,7 @@ renderDictionaryEvidence evidence =
     else HH.div
       [ HP.style "margin-top: 24px;" ]
       [ HH.h5
-          [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Lalezar', cursive; font-size: 1.1rem;" ]
+          [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Effra Regular', sans-serif; font-size: 1.1rem;" ]
           [ HH.text $ "دليل معجمي (" <> show (Array.length evidence) <> " معجم)" ]
       , HH.div
           [ HP.style "display: flex; flex-direction: column; gap: 8px;" ]
@@ -921,10 +931,10 @@ renderDictionaryEvidence evidence =
       in HH.div
         [ HP.style "padding: 12px; background: white; border-right: 4px solid #667eea; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" ]
         [ HH.div
-            [ HP.style "font-family: 'Lalezar', cursive; color: #667eea; font-size: 1rem; margin-bottom: 6px; direction: rtl;" ]
+            [ HP.style "font-family: 'Effra Regular', sans-serif; color: #667eea; font-size: 1rem; margin-bottom: 6px; direction: rtl;" ]
             [ HH.text ev.dictName ]
         , HH.div
-            [ HP.style "font-family: 'Scheherazade New', serif; font-size: 0.95rem; color: #333; direction: rtl; line-height: 1.6;" ]
+            [ HP.style "font-family: 'Effra Regular', sans-serif; font-size: 0.95rem; color: #333; direction: rtl; line-height: 1.6;" ]
             [ HH.text ev.relevantExcerpt ]
         ]
 
@@ -936,7 +946,7 @@ renderQuranicEvidence evidence =
     else HH.div
       [ HP.style "margin-top: 24px;" ]
       [ HH.h5
-          [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Lalezar', cursive; font-size: 1.1rem;" ]
+          [ HP.style "margin: 0 0 8px 0; color: #667eea; font-family: 'Effra Regular', sans-serif; font-size: 1.1rem;" ]
           [ HH.text $ "دليل قرآني (" <> show (Array.length evidence) <> " آية)" ]
       , HH.div
           [ HP.style "display: flex; flex-direction: column; gap: 8px;" ]
@@ -949,10 +959,10 @@ renderQuranicEvidence evidence =
       in HH.div
         [ HP.style "padding: 12px; background: white; border-right: 4px solid #764ba2; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" ]
         [ HH.div
-            [ HP.style "font-family: 'Lalezar', cursive; color: #764ba2; font-size: 1rem; margin-bottom: 6px; direction: rtl;" ]
+            [ HP.style "font-family: 'Effra Regular', sans-serif; color: #764ba2; font-size: 1rem; margin-bottom: 6px; direction: rtl;" ]
             [ HH.text $ "سورة " <> show ref.refSurah <> " آية " <> show ref.refVerse ]
         , HH.div
-            [ HP.style "font-family: 'Scheherazade New', serif; font-size: 1.1rem; color: #333; direction: rtl; line-height: 1.8;" ]
+            [ HP.style "font-family: 'Effra Regular', sans-serif; font-size: 1.1rem; color: #333; direction: rtl; line-height: 1.8;" ]
             [ HH.text ev.wordContext ]
         ]
 
@@ -978,7 +988,7 @@ renderResults state entries =
                 ]
                 [ HH.text $ if state.dictsSectionExpanded then "▼" else "◀" ]
             , HH.h3
-                [ HP.style "margin: 0; font-family: 'Lalezar', cursive; font-size: 1.4rem;" ]
+                [ HP.style "margin: 0; font-family: 'RB Regular', sans-serif; font-size: 1.4rem;" ]
                 [ HH.text "المعاجم العربية" ]
             ]
         -- Right side: Count badge
@@ -1020,7 +1030,7 @@ renderResults state entries =
                 [ HH.text $ if isExpanded then "▼ " else "◀ " ]
             , HH.h4
                 [ HP.class_ (HH.ClassName "dict-name")
-                , HP.style "font-family: 'Lalezar', cursive;"
+                , HP.style "font-family: 'Effra Regular', sans-serif;"
                 ]
                 [ HH.text dictName ]
             , HH.span
@@ -1052,19 +1062,29 @@ renderResults state entries =
             [ -- Copy button
               HH.button
                 [ HP.type_ HP.ButtonButton
-                , HP.style "padding: 4px 8px; font-size: 0.85rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                , HP.style "padding: 6px 10px; font-size: 1.2rem; background: #667eea; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px;"
                 , HP.title "نسخ النص"
                 , HE.onClick \_ -> CopyText entryKey entry.definitionArabic
                 ]
-                [ HH.text $ if wasCopied then "✓ تم النسخ" else "نسخ" ]
+                [ HH.i
+                    [ HP.class_ (HH.ClassName "material-icons")
+                    , HP.style "font-size: 18px;"
+                    ]
+                    [ HH.text $ if wasCopied then "check" else "content_copy" ]
+                ]
             -- Tashkeel toggle button
             , HH.button
                 [ HP.type_ HP.ButtonButton
-                , HP.style "padding: 4px 8px; font-size: 0.85rem; background: #764ba2; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                , HP.style "padding: 6px 10px; font-size: 1.2rem; background: #764ba2; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; min-width: 36px;"
                 , HP.title "إخفاء/إظهار التشكيل"
                 , HE.onClick \_ -> ToggleTashkeel entryKey
                 ]
-                [ HH.text $ if tashkeelHidden then "إظهار التشكيل" else "إخفاء التشكيل" ]
+                [ HH.i
+                    [ HP.class_ (HH.ClassName "material-icons")
+                    , HP.style "font-size: 18px;"
+                    ]
+                    [ HH.text "format_size" ]
+                ]
             ]
         , HH.div
             [ HP.class_ (HH.ClassName "entry-definition") ]
@@ -1086,7 +1106,7 @@ renderEtymologyPanel state =
           [ HP.style "margin: 0 auto 20px auto; max-width: 800px; border-radius: 12px; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2); overflow: hidden;" ]
           [ -- Header with toggle
             HH.div
-              [ HP.style "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
+              [ HP.style "background: linear-gradient(135deg, #4a90e2 0%, #667eea 100%); padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; cursor: pointer;"
               , HE.onClick \_ -> ToggleEtymologyGraph
               ]
               [ -- Left: Collapse/expand button
@@ -1098,7 +1118,7 @@ renderEtymologyPanel state =
                   [ HH.text $ if state.showEtymologyGraph then "▼" else "◀" ]
               -- Middle: Title (clickable to collapse/expand)
               , HH.h3
-                  [ HP.style "margin: 0; color: white; font-family: 'Lalezar', cursive; font-size: 1.4rem; direction: rtl; flex: 1; display: flex; align-items: center; gap: 8px;"
+                  [ HP.style "margin: 0; color: white; font-family: 'RB Regular', sans-serif; font-size: 1.4rem; direction: rtl; flex: 1; display: flex; align-items: center; gap: 8px;"
                   ]
                   [ HH.span [ HP.class_ (HH.ClassName "material-icons"), HP.style "font-size: 24px;" ] [ HH.text "account_tree" ]
                   , HH.text "شبكة العلاقات الاشتقاقية "

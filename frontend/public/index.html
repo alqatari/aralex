@@ -23,18 +23,64 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="alternate icon" href="/favicon.ico">
 
-    <!-- Google Fonts - Arabic -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Readex+Pro:wght@300;400;600&family=Lalezar&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
-
-    <!-- Google Fonts - Latin -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,300;8..144,400;8..144,600&family=Oswald:wght@400;600&family=Cascadia+Code&display=swap" rel="stylesheet">
-
     <!-- Material Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Scheherazade+New:wght@400;700&family=Aref+Ruqaa:wght@400;700&display=swap" rel="stylesheet">
+
     <style>
+        /* Custom Font Declarations */
+        @font-face {
+            font-family: 'RB Regular';
+            src: url('/public/fonts/RB_Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'Effra Thin';
+            src: url('/public/fonts/fonnts.com-Effra_CC_Arbc_Thin.otf') format('opentype');
+            font-weight: 100;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'Effra Light';
+            src: url('/public/fonts/fonnts.com-Effra_Arbc_Light.otf') format('opentype');
+            font-weight: 300;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'Effra Regular';
+            src: url('/public/fonts/fonnts.com-Effra_Arbc_Regular.otf') format('opentype');
+            font-weight: 400;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'KFGQPC Uthmanic HAFS';
+            src: url('/public/fonts/KFGQPC_Uthmanic_Script_HAFS_Regular.otf') format('opentype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
+        @font-face {
+            font-family: 'KFGQPC Uthman Naskh';
+            src: url('/public/fonts/KFGQPC_Uthman_Taha_Naskh_Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+            font-display: swap;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -42,11 +88,18 @@
         }
 
         body {
-            font-family: 'Roboto Flex', sans-serif;
+            font-family: 'Effra Regular', sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #333;
             min-height: 100vh;
             padding: 40px 20px;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
         }
 
         .app-container {
@@ -69,11 +122,11 @@
         }
 
         .app-title {
-            font-family: 'Lalezar', cursive;
+            font-family: 'Aref Ruqaa', serif;
             font-size: 3.1rem;
             color: white;
             margin: 0 0 10px 0;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
 
         .subtitle {
@@ -83,6 +136,22 @@
             margin: 0;
             direction: rtl;
             font-weight: 400;
+        }
+
+        /* Mobile Responsive - Header */
+        @media (max-width: 768px) {
+            .app-title {
+                font-size: 2.2rem;
+                letter-spacing: 0;
+            }
+
+            .subtitle {
+                font-size: 1.8rem;
+            }
+
+            .header {
+                padding: 30px 20px 20px 20px;
+            }
         }
 
         /* Search Section */
@@ -106,7 +175,7 @@
             flex: 1;
             padding: 16px 20px;
             font-size: 1.3rem;
-            font-family: 'Scheherazade New', serif;
+            font-family: 'Effra Light', sans-serif;
             border: 2px solid #ddd;
             border-radius: 8px;
             direction: rtl;
@@ -123,7 +192,7 @@
         .search-button {
             padding: 16px 40px;
             font-size: 1.2rem;
-            font-family: 'Scheherazade New', serif;
+            font-family: 'Effra Regular', sans-serif;
             font-weight: 600;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -143,6 +212,29 @@
             cursor: not-allowed;
         }
 
+        /* Mobile Responsive - Search */
+        @media (max-width: 768px) {
+            .search-section {
+                padding: 30px 20px;
+            }
+
+            .search-input-group {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .search-input {
+                font-size: 1.1rem;
+                padding: 14px 16px;
+            }
+
+            .search-button {
+                width: 100%;
+                padding: 14px 20px;
+                font-size: 1.1rem;
+            }
+        }
+
         /* Results Section */
         .results-section {
             padding: 40px;
@@ -157,6 +249,7 @@
             margin-bottom: 20px;
             text-align: center;
             border: 1px solid #fcc;
+            font-family: 'Effra Regular', sans-serif;
         }
 
         .loading {
@@ -164,6 +257,24 @@
             color: #667eea;
             font-size: 1.2rem;
             padding: 40px;
+            font-family: 'Effra Regular', sans-serif;
+        }
+
+        /* Mobile Responsive - Results */
+        @media (max-width: 768px) {
+            .results-section {
+                padding: 20px;
+            }
+
+            .loading {
+                font-size: 1rem;
+                padding: 30px 20px;
+            }
+
+            .error-message {
+                font-size: 0.95rem;
+                padding: 12px;
+            }
         }
 
         .dict-groups {
@@ -204,7 +315,7 @@
         }
 
         .dict-name {
-            font-family: 'Scheherazade New', serif;
+            font-family: 'RB Regular', serif;
             font-size: 1.1rem;
             color: #333;
             margin: 0;
@@ -227,7 +338,7 @@
         }
 
         .dictionary-entry {
-            background: white;
+            background: #FFFCF5;
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 24px;
@@ -241,7 +352,7 @@
         }
 
         .entry-definition {
-            font-family: 'Scheherazade New', serif;
+            font-family: 'KFGQPC Uthman Naskh', serif;
             font-size: 1.2rem;
             line-height: 2;
             color: #333;
@@ -252,7 +363,7 @@
 
         /* Verse text styling */
         .verse-text {
-            font-family: 'Scheherazade New', serif;
+            font-family: 'KFGQPC Uthmanic HAFS', serif;
             font-size: 1.8rem;
             line-height: 2.8;
             color: #1a1a1a;
@@ -260,7 +371,7 @@
             direction: rtl;
             text-align: right;
             padding: 16px;
-            background: white;
+            background: #FFFCF5;
             border-radius: 8px;
             border-right: 4px solid #667eea;
         }
@@ -273,6 +384,104 @@
             border-radius: 4px;
             font-size: 0.95rem;
             color: #667eea;
+        }
+
+        /* ============================================ */
+        /* MOBILE RESPONSIVE - Comprehensive Queries   */
+        /* ============================================ */
+
+        @media (max-width: 768px) {
+            /* Dictionary Groups & Entries */
+            .dict-group {
+                border-radius: 6px;
+            }
+
+            .dict-header {
+                padding: 12px 16px;
+                font-size: 0.95rem;
+            }
+
+            .dict-name {
+                font-size: 1rem;
+            }
+
+            .entry-count {
+                font-size: 0.85rem;
+            }
+
+            .dict-entries {
+                padding: 8px 12px;
+            }
+
+            .dictionary-entry {
+                padding: 16px;
+                margin-bottom: 12px;
+            }
+
+            .entry-definition {
+                font-size: 1.1rem;
+                line-height: 1.8;
+            }
+
+            /* Verse Text */
+            .verse-text {
+                font-size: 1.5rem;
+                line-height: 2.4;
+                padding: 12px;
+            }
+
+            /* App Container */
+            .app-container {
+                border-radius: 12px;
+            }
+
+            /* Code elements */
+            code {
+                font-size: 0.85rem;
+                padding: 3px 6px;
+            }
+        }
+
+        /* Small phones (< 480px) */
+        @media (max-width: 480px) {
+            .app-title {
+                font-size: 1.8rem;
+            }
+
+            .subtitle {
+                font-size: 1.4rem;
+            }
+
+            .header {
+                padding: 20px 15px 15px 15px;
+            }
+
+            .search-section {
+                padding: 20px 15px;
+            }
+
+            .results-section {
+                padding: 15px;
+            }
+
+            .verse-text {
+                font-size: 1.3rem;
+                line-height: 2.2;
+                padding: 10px;
+            }
+
+            .entry-definition {
+                font-size: 1rem;
+                line-height: 1.7;
+            }
+
+            .dict-header {
+                padding: 10px 12px;
+            }
+
+            .dictionary-entry {
+                padding: 12px;
+            }
         }
     </style>
 </head>
