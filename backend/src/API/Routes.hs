@@ -66,7 +66,7 @@ server dbConns@(DatabaseConnections dictConn' quranConn') =
     getDictionaryEntry rootText = liftIO $ H.lookupRoot dictConn' (RootText rootText)
 
     getVersesByRoot :: Text -> Handler [VerseWithRoot]
-    getVersesByRoot rootText = liftIO $ H.lookupVersesByRoot quranConn' (RootText rootText)
+    getVersesByRoot searchText = liftIO $ H.lookupVersesByWord quranConn' searchText
 
     getMorphology :: Int -> Int -> Handler [QuranicWordDTO]
     getMorphology surahNum verseNum = liftIO $ H.lookupMorphology quranConn' surahNum verseNum

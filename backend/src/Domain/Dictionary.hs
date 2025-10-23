@@ -6,7 +6,7 @@ Description : Domain types for classical Arabic dictionary entries
 Copyright   : (c) Ali Al-Qatari, 2025
 License     : MIT
 
-Types representing entries from 7 classical Arabic dictionaries.
+Types representing entries from 6 classical Arabic dictionaries (Qamus excluded).
 -}
 
 module Domain.Dictionary
@@ -18,6 +18,7 @@ module Domain.Dictionary
   , DictEntry(..)
   , RootText(..)
   , normalizeRoot
+  , normalizeArabicText
     -- * Utilities
   , getDictSourceId
   , isEarlyDictionary
@@ -29,15 +30,14 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
 
--- | Unique identifiers for the 7 classical dictionaries
+-- | Unique identifiers for the 6 classical dictionaries (Qamus excluded for size/cost)
 data DictionaryId
-  = AinId        -- ^ Kitab al-Ain (786 CE) - 2,708 entries
-  | SihahId      -- ^ Al-Sihah (1003 CE) - 5,599 entries
+  = AinId        -- ^ Kitab al-Ain (786 CE) - 2,707 entries
+  | SihahId      -- ^ Al-Sihah (1003 CE) - 5,594 entries
   | MaqayisId    -- ^ Maqayis al-Lugha (1004 CE) - 4,794 entries
-  | MuhkamId     -- ^ Al-Muhkam (1066 CE) - 6,588 entries
-  | MufradatId   -- ^ Al-Mufradat (1108 CE) - 1,603 entries
-  | LisanId      -- ^ Lisan al-Arab (1311 CE) - 9,030 entries
-  | QamusId      -- ^ Qamus al-Muhit (1414 CE) - 10,323 entries
+  | MuhkamId     -- ^ Al-Muhkam (1066 CE) - 6,584 entries
+  | MufradatId   -- ^ Al-Mufradat (1108 CE) - 1,602 entries
+  | LisanId      -- ^ Lisan al-Arab (1311 CE) - 9,029 entries
   deriving (Eq, Ord, Show, Read, Enum, Bounded, Generic)
 
 instance ToJSON DictionaryId
@@ -56,7 +56,7 @@ data DictionarySource = DictionarySource
 instance ToJSON DictionarySource
 instance FromJSON DictionarySource
 
--- | Metadata for all 7 dictionaries
+-- | Metadata for all 6 dictionaries (deduplicated counts, Qamus excluded)
 dictionaryMetadata :: [DictionarySource]
 dictionaryMetadata =
   [ DictionarySource
@@ -64,7 +64,7 @@ dictionaryMetadata =
       , author = "Al-Khalīl b. Aḥmad al-Farāhīdī"
       , title = "Kitāb al-ʿAin"
       , deathYear = 786
-      , entryCount = 2708
+      , entryCount = 2707
       , filename = "ain_entries_20251017_002737.json"
       }
   , DictionarySource
@@ -72,7 +72,7 @@ dictionaryMetadata =
       , author = "Al-Jawharī"
       , title = "Al-Ṣiḥāḥ"
       , deathYear = 1003
-      , entryCount = 5599
+      , entryCount = 5594
       , filename = "sihah_entries_20251017_092639.json"
       }
   , DictionarySource
@@ -88,7 +88,7 @@ dictionaryMetadata =
       , author = "Ibn Sīda"
       , title = "Al-Muḥkam"
       , deathYear = 1066
-      , entryCount = 6588
+      , entryCount = 6584
       , filename = "al_muhkam_entries_20251017_111834.json"
       }
   , DictionarySource
@@ -96,24 +96,16 @@ dictionaryMetadata =
       , author = "Al-Rāghib al-Iṣfahānī"
       , title = "Al-Mufradāt"
       , deathYear = 1108
-      , entryCount = 1603
-      , filename = "mofradat_entries_20251016_024800.json"
+      , entryCount = 1602
+      , filename = "mofradat_merged_20251023_200836.json"
       }
   , DictionarySource
       { dictId = LisanId
       , author = "Ibn Manẓūr"
       , title = "Lisān al-ʿArab"
       , deathYear = 1311
-      , entryCount = 9030
+      , entryCount = 9029
       , filename = "lisan_entries_20251017_181614.json"
-      }
-  , DictionarySource
-      { dictId = QamusId
-      , author = "Fīrūzābādī"
-      , title = "Qāmūs al-Muḥīṭ"
-      , deathYear = 1414
-      , entryCount = 10323
-      , filename = "qamus_entries_20251018_062104.json"
       }
   ]
 
@@ -133,6 +125,40 @@ normalizeRoot :: RootText -> RootText
 normalizeRoot (RootText txt) = RootText $ T.filter (not . isDiacritic) txt
   where
     isDiacritic c = c `elem` ['\x064B'..'\x0652'] -- Arabic diacritics range
+
+-- | Comprehensive Arabic text normalization (matches database normalization)
+-- Removes diacritics and normalizes hamza, alif, and ya variations
+normalizeArabicText :: Text -> Text
+normalizeArabicText = normalizeYa . normalizeAlif . normalizeHamza . removeDiacritics
+  where
+    -- Remove Arabic diacritics (U+064B to U+0652)
+    removeDiacritics = T.filter (not . isDiacritic)
+    isDiacritic c = c `elem` ['\x064B'..'\x0652']
+
+    -- Normalize hamza variations
+    normalizeHamza txt = T.map (\c -> case c of
+      '\x0623' -> '\x0627'  -- أ → ا (alif with hamza above)
+      '\x0625' -> '\x0627'  -- إ → ا (alif with hamza below)
+      '\x0622' -> '\x0627'  -- آ → ا (alif with madda)
+      '\x0624' -> '\x0648'  -- ؤ → و (waw with hamza)
+      '\x0626' -> '\x064A'  -- ئ → ي (ya with hamza)
+      _ -> c
+      ) txt
+
+    -- Normalize alif variations
+    normalizeAlif txt =
+      let mapped = T.map (\c -> case c of
+            '\x0671' -> '\x0627'  -- ٱ → ا (alif wasla)
+            '\x0649' -> '\x064A'  -- ى → ي (alif maqsura)
+            _ -> c
+            ) txt
+      in T.filter (/= '\x0670') mapped  -- Remove alif khanjariyah
+
+    -- Normalize ya variations
+    normalizeYa txt = T.map (\c -> case c of
+      '\x06CC' -> '\x064A'  -- ی → ي (Farsi ya)
+      _ -> c
+      ) txt
 
 -- | Dictionary entry (lightweight - only essential fields)
 data DictEntry = DictEntry
@@ -164,8 +190,7 @@ getDictSourceId src
   | "Sīda"     `T.isInfixOf` src = Just MuhkamId
   | "Rāghib"   `T.isInfixOf` src = Just MufradatId
   | "Manẓūr"   `T.isInfixOf` src = Just LisanId
-  | "Fīrūzābādī" `T.isInfixOf` src = Just QamusId
-  | otherwise = Nothing
+  | otherwise = Nothing  -- Qamus excluded
 
 -- | Check if dictionary is from early period (pre-1100 CE)
 isEarlyDictionary :: DictionaryId -> Bool
@@ -176,4 +201,3 @@ isEarlyDictionary dictId = case dictId of
   MuhkamId  -> True
   MufradatId -> False
   LisanId   -> False
-  QamusId   -> False

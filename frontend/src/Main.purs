@@ -61,6 +61,7 @@ type State =
   , analysisExpanded :: Boolean  -- Track if analysis panel is expanded
   , legendExpanded :: Boolean  -- Track if color legend is expanded
   , showEtymologyGraph :: Boolean  -- Track if etymology graph modal is shown
+  , isRoot :: Boolean  -- Track if current search word is a root word
   }
 
 data Action
@@ -125,6 +126,7 @@ initialState _ =
   , analysisExpanded: false  -- Analysis panel collapsed by default
   , legendExpanded: false  -- Color legend collapsed by default
   , showEtymologyGraph: false  -- Graph modal hidden by default
+  , isRoot: true  -- Assume root by default
   }
 
 -- Utility functions imported from Util.* modules
@@ -344,7 +346,9 @@ handleAction = case _ of
                       H.modify_ _ { isSearching = false, error = Just "Invalid dictionary response from server", verses = verses }
 
                     Right (entries :: Array DictEntry) -> do
-                      H.modify_ _ { isSearching = false, results = entries, verses = verses }
+                      -- Detect if this is a root word (has dictionary entries)
+                      let isRootWord = not (null entries)
+                      H.modify_ _ { isSearching = false, results = entries, verses = verses, isRoot = isRootWord }
                       -- Automatically trigger phonosemantic analysis for the search query
                       handleAction (AnalyzeWord query)
 
@@ -425,8 +429,15 @@ renderVerses state verses =
                   ]
                   [ HH.text $ if state.quranSectionExpanded then "▼" else "◀" ]
               , HH.h3
-                  [ HP.style "margin: 0; font-family: 'RB Regular', sans-serif; font-size: 1.4rem;" ]
-                  [ HH.text "الآيات القرآنية" ]
+                  [ HP.style "margin: 0; font-family: 'RB Regular', sans-serif; font-size: 1.4rem; display: flex; align-items: center; gap: 10px;" ]
+                  [ HH.text "الآيات القرآنية"
+                  -- Show indicator if word is not a root
+                  , if not state.isRoot
+                      then HH.span
+                        [ HP.style "background: rgba(255,255,255,0.3); padding: 4px 12px; border-radius: 12px; font-size: 0.9rem; font-weight: bold;" ]
+                        [ HH.text "[ليست جذراً]" ]
+                      else HH.text ""
+                  ]
               ]
           -- Right side: Count badge (showing occurrences, verses, and surahs)
           , HH.span
@@ -966,6 +977,44 @@ renderQuranicEvidence evidence =
             [ HH.text ev.wordContext ]
         ]
 
+-- Render message for non-root words
+renderNonRootMessage :: forall m. State -> H.ComponentHTML Action Slots m
+renderNonRootMessage state =
+  HH.div
+    [ HP.style "margin-bottom: 24px; max-width: 800px; margin-left: auto; margin-right: auto;" ]
+    [ HH.div
+        [ HP.style "padding: 16px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 8px; text-align: center; font-family: 'RB Regular', sans-serif; font-size: 1.4rem;" ]
+        [ HH.h3
+            [ HP.style "margin: 0 0 12px 0;" ]
+            [ HH.text "المعاجم العربية" ]
+        , HH.div
+            [ HP.style "background: rgba(255,255,255,0.2); padding: 12px 20px; border-radius: 8px; font-size: 1.1rem; margin-top: 12px;" ]
+            [ HH.text "المعاجم تعرض محتوى الجذور فقط. الكلمة المبحوث عنها ليست جذراً." ]
+        , renderExternalLinksMessage
+        ]
+    ]
+
+-- Render external dictionary links message (shown always)
+renderExternalLinksMessage :: forall m. H.ComponentHTML Action Slots m
+renderExternalLinksMessage =
+  HH.div
+    [ HP.style "background: rgba(255,255,255,0.15); padding: 12px 20px; border-radius: 8px; font-size: 1rem; margin-top: 12px; text-align: center; direction: rtl;" ]
+    [ HH.text "للبحث الشامل، استخدم: "
+    , HH.a
+        [ HP.href "https://dohadictionary.org"
+        , HP.target "_blank"
+        , HP.style "color: #fbbf24; text-decoration: underline; font-weight: bold; margin: 0 6px;"
+        ]
+        [ HH.text "قاموس الدوحة" ]
+    , HH.text " أو "
+    , HH.a
+        [ HP.href "https://tafsir.app"
+        , HP.target "_blank"
+        , HP.style "color: #fbbf24; text-decoration: underline; font-weight: bold; margin: 0 6px;"
+        ]
+        [ HH.text "تطبيق التفسير" ]
+    ]
+
 -- Render dictionary results grouped by dictionary
 renderResults :: forall m. State -> Array DictEntry -> H.ComponentHTML Action Slots m
 renderResults state entries =
@@ -996,6 +1045,10 @@ renderResults state entries =
             [ HP.style "background: rgba(255,255,255,0.2); padding: 6px 16px; border-radius: 16px; font-weight: bold;" ]
             [ HH.text $ show (length entries) <> " مدخل في " <> show (length grouped) <> " معجم" ]
         ]
+    -- External links message (shown always when section is expanded)
+    , if state.dictsSectionExpanded
+        then renderExternalLinksMessage
+        else HH.div_ []
     -- Dictionary groups (only shown when section is expanded)
     , if state.dictsSectionExpanded
         then HH.div
@@ -1163,7 +1216,9 @@ render state =
                     , HE.onValueInput UpdateSearch
                     , HE.onKeyDown HandleKeyPress
                     , HP.attr (HH.AttrName "lang") "ar"
+                    , HP.attr (HH.AttrName "dir") "rtl"
                     , HP.attr (HH.AttrName "inputmode") "text"
+                    , HP.autofocus true
                     ]
                 , HH.button
                     [ HP.type_ HP.ButtonButton
@@ -1202,12 +1257,16 @@ render state =
               [ -- Show verses FIRST (priority)
                 if not (null state.verses)
                   then renderVerses state state.verses
-                  else HH.div_ []
+                  else if state.searchQuery /= "" && not state.isSearching
+                    then HH.div_ []  -- Show nothing if no verses found
+                    else HH.div_ []
 
-              -- Show dictionary results SECOND
+              -- Show dictionary results SECOND (or message if not a root)
               , if not (null state.results)
                   then renderResults state state.results
-                  else HH.div_ []
+                  else if state.searchQuery /= "" && not state.isSearching && not state.isRoot
+                    then renderNonRootMessage state
+                    else HH.div_ []
               ]
         ]
 

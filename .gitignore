@@ -1,6 +1,12 @@
 # Scrapers (completed work, large files)
 scrapers/
 
+# Dictionary JSON files (large, kept as backups)
+data/arabic_dicts/*.json
+
+# Backup zips
+*.zip
+
 # Old documentation
 docs_old/
 

@@ -12,6 +12,7 @@ module API.Handlers
   , lookupMorphology
   , lookupVerse
   , lookupVersesByRoot
+  , lookupVersesByWord
   , performAnalysis
   , getAllLetters
   , getLetterMeaning
@@ -26,7 +27,7 @@ import Database.SQLite.Simple
 
 import Database.Instances ()  -- Import FromRow instances
 import Database.Schema (DatabaseConnections(..))
-import Domain.Dictionary (DictEntry(..), RootText(..), DictionaryId, normalizeRoot)
+import Domain.Dictionary (DictEntry(..), RootText(..), DictionaryId, normalizeRoot, normalizeArabicText)
 import Domain.Morphology (QuranicWord, MorphSegment, aggregateSegments)
 import Domain.MorphologyDTO (QuranicWordDTO, wordToDTO, segmentFromDTO)
 import Domain.Verse (VerseText(..), VerseRef(..), mkVerseRef, VerseWithRoot(..), getSurahInfo, SurahInfo(..), SurahName(..))
@@ -145,6 +146,53 @@ lookupVersesByRoot conn (RootText rootText) = do
           , vwrSurahName = surahNameArabic
           , vwrWordIndices = positions
           , vwrOccurrences = occurrences
+          }
+
+-- | Look up all verses containing a specific word (not necessarily a root)
+-- This searches the verse text directly for word occurrences
+lookupVersesByWord :: Connection -> Text -> IO [VerseWithRoot]
+lookupVersesByWord conn wordText = do
+  -- First check if it's a root in the morphology database
+  rootResults <- query conn
+    "SELECT DISTINCT root FROM quranic_words WHERE root = ? LIMIT 1"
+    (Only wordText) :: IO [Only (Maybe Text)]
+
+  case rootResults of
+    -- If it's a root, use the normal root-based search
+    (Only (Just _):_) -> lookupVersesByRoot conn (RootText wordText)
+    -- If not a root, search verse text directly using normalized text
+    _ -> do
+      -- Normalize the search term to match against text_normalized column
+      -- This handles: diacritics, hamza variations, alif variations, ya variations
+      let normalized = normalizeArabicText wordText
+
+      rows <- query conn
+        "SELECT DISTINCT v.surah, v.verse, v.text \
+        \FROM verses v \
+        \WHERE v.text_normalized LIKE ? \
+        \ORDER BY v.surah ASC, v.verse ASC"
+        (Only ("%" <> normalized <> "%")) :: IO [(Int, Int, Text)]
+
+      -- Convert rows to VerseWithRoot (but mark as non-root)
+      pure $ map rowToVerseWithWord rows
+  where
+    rowToVerseWithWord :: (Int, Int, Text) -> VerseWithRoot
+    rowToVerseWithWord (surahNum, verseNum, verseText) =
+      let ref = case mkVerseRef surahNum verseNum of
+                  Just r -> r
+                  Nothing -> error $ "Invalid verse reference: " <> show surahNum <> ":" <> show verseNum
+          -- Get surah name from metadata
+          surahNameArabic = case getSurahInfo surahNum of
+                        Just info -> arabic (surahName info)
+                        Nothing -> ""
+          -- For non-root words, we don't have word positions, use empty list
+      in VerseWithRoot
+          { vwrVerseRef = ref
+          , vwrText = verseText
+          , vwrRoot = wordText
+          , vwrSurahName = surahNameArabic
+          , vwrWordIndices = []  -- No positions for non-root words
+          , vwrOccurrences = 1   -- Assuming at least 1 occurrence
           }
 
 -- | Perform phonosemantic analysis using Hassan Abbas's theory
