@@ -1,77 +1,79 @@
-{-|
-Module      : API.Handlers
-Description : API request handlers
-Copyright   : (c) Ali Al-Qatari, 2025
-License     : MIT
+{-# LANGUAGE ImportQualifiedPost #-}
 
-Handler implementations for API endpoints with database queries.
--}
-
+-- |
+-- Module      : API.Handlers
+-- Description : API request handlers
+-- Copyright   : (c) Ali Al-Qatari, 2025
+-- License     : MIT
+--
+-- Handler implementations for API endpoints with database queries.
 module API.Handlers
-  ( lookupRoot
-  , lookupMorphology
-  , lookupVerse
-  , lookupVersesByRoot
-  , lookupVersesByWord
-  , performAnalysis
-  , getAllLetters
-  , getLetterMeaning
-  , DatabaseConnections(..)
-  ) where
+  ( lookupRoot,
+    lookupMorphology,
+    lookupVerse,
+    lookupVersesByRoot,
+    lookupVersesByWord,
+    performAnalysis,
+    getAllLetters,
+    getLetterMeaning,
+    DatabaseConnections (..),
+  )
+where
 
 import Data.Aeson (decode)
-import qualified Data.ByteString.Lazy as BL
+import Data.ByteString.Lazy qualified as BL
 import Data.Text (Text)
-import qualified Data.Text as T
+import Data.Text qualified as T
+import Database.Instances ()
 import Database.SQLite.Simple
-
-import Database.Instances ()  -- Import FromRow instances
-import Database.Schema (DatabaseConnections(..))
-import Domain.Dictionary (DictEntry(..), RootText(..), DictionaryId, normalizeRoot, normalizeArabicText)
-import Domain.Morphology (QuranicWord, MorphSegment, aggregateSegments)
-import Domain.MorphologyDTO (QuranicWordDTO, wordToDTO, segmentFromDTO)
-import Domain.Verse (VerseText(..), VerseRef(..), mkVerseRef, VerseWithRoot(..), getSurahInfo, SurahInfo(..), SurahName(..))
+-- Import FromRow instances
+import Database.Schema (DatabaseConnections (..))
+import Domain.Dictionary (DictEntry (..), DictionaryId, RootText (..), normalizeArabicText, normalizeRoot)
+import Domain.Morphology (MorphSegment, QuranicWord, aggregateSegments)
+import Domain.MorphologyDTO (QuranicWordDTO, segmentFromDTO, wordToDTO)
 import Domain.Phonosemantics
-  ( WordAnalysis(..)
-  , ArabicLetter(..)
-  , LetterBreakdown(..)
-  , LetterMeaning(..)
-  , LetterAttribute(..)
-  , LetterCategory(..)
-  , ArticulationPoint(..)
-  , PhonosemanticPattern(..)
-  , DictionaryEvidence(..)
-  , QuranicEvidence(..)
-  , extractLetters
-  , getLetterCategory
-  , getArticulationPoint
+  ( ArabicLetter (..),
+    ArticulationPoint (..),
+    DictionaryEvidence (..),
+    LetterAttribute (..),
+    LetterBreakdown (..),
+    LetterCategory (..),
+    LetterMeaning (..),
+    PhonosemanticPattern (..),
+    QuranicEvidence (..),
+    WordAnalysis (..),
+    extractLetters,
+    getArticulationPoint,
+    getLetterCategory,
   )
+import Domain.Verse (SurahInfo (..), SurahName (..), VerseRef (..), VerseText (..), VerseWithRoot (..), getSurahInfo, mkVerseRef)
 
 -- | Normalize letter for database lookup
 -- Converts all hamza forms to standalone ء
 normalizeLetter :: Text -> Text
 normalizeLetter t = case T.unpack t of
-  ['أ'] -> "ء"  -- hamza on alif
-  ['إ'] -> "ء"  -- hamza under alif
-  ['آ'] -> "ء"  -- hamza madda
-  ['ؤ'] -> "ء"  -- hamza on waw
-  ['ئ'] -> "ء"  -- hamza on ya
-  _     -> t    -- keep other letters as-is
+  ['أ'] -> "ء" -- hamza on alif
+  ['إ'] -> "ء" -- hamza under alif
+  ['آ'] -> "ء" -- hamza madda
+  ['ؤ'] -> "ء" -- hamza on waw
+  ['ئ'] -> "ء" -- hamza on ya
+  _ -> t -- keep other letters as-is
 
 -- | Look up dictionary entries by root
 lookupRoot :: Connection -> RootText -> IO [DictEntry]
 lookupRoot conn (RootText rootText) = do
-  query conn
+  query
+    conn
     "SELECT e.id, e.dict_source_id, e.root, e.root_normalized, e.definition_arabic, \
     \(CASE s.author \
-      \WHEN 'Al-Khalīl b. Aḥmad al-Farāhīdī' THEN 'الخليل بن أحمد الفراهيدي، كتاب العين (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Al-Jawharī' THEN 'الجوهري، الصحاح (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Ibn Fāris' THEN 'ابن فارس، مقاييس اللغة (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Ibn Sīda' THEN 'ابن سيده، المحكم (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Al-Rāghib al-Iṣfahānī' THEN 'الراغب الأصفهاني، المفردات (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Ibn Manẓūr' THEN 'ابن منظور، لسان العرب (ت. ' || s.death_year || ' م)' \
-      \WHEN 'Fīrūzābādī' THEN 'الفيروزآبادي، القاموس المحيط (ت. ' || s.death_year || ' م)' \
-      \ELSE s.author || ', ' || s.title || ' (d. ' || s.death_year || ' CE)' \
+    \WHEN 'Al-Khalīl b. Aḥmad al-Farāhīdī' THEN 'الخليل بن أحمد الفراهيدي، كتاب العين (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Al-Jawharī' THEN 'الجوهري، الصحاح (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Ibn Fāris' THEN 'ابن فارس، مقاييس اللغة (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Ibn Sīda' THEN 'ابن سيده، المحكم (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Al-Rāghib al-Iṣfahānī' THEN 'الراغب الأصفهاني، المفردات (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Ibn Manẓūr' THEN 'ابن منظور، لسان العرب (ت. ' || s.death_year || ' م)' \
+    \WHEN 'Fīrūzābādī' THEN 'الفيروزآبادي، القاموس المحيط (ت. ' || s.death_year || ' م)' \
+    \ELSE s.author || ', ' || s.title || ' (d. ' || s.death_year || ' CE)' \
     \END) as dictionary_source \
     \FROM dictionary_entries e \
     \JOIN dictionary_sources s ON e.dict_source_id = s.id \
@@ -84,9 +86,12 @@ lookupRoot conn (RootText rootText) = do
 -- | Look up morphology by verse
 lookupMorphology :: Connection -> Int -> Int -> IO [QuranicWordDTO]
 lookupMorphology conn surahNum verseNum = do
-  rows <- query conn
-    "SELECT surface_form, root, lemma, pos, segments_json FROM quranic_words WHERE surah = ? AND verse = ? ORDER BY word_position"
-    (surahNum, verseNum) :: IO [(Text, Maybe Text, Maybe Text, String, BL.ByteString)]
+  rows <-
+    query
+      conn
+      "SELECT surface_form, root, lemma, pos, segments_json FROM quranic_words WHERE surah = ? AND verse = ? ORDER BY word_position"
+      (surahNum, verseNum) ::
+      IO [(Text, Maybe Text, Maybe Text, String, BL.ByteString)]
 
   -- Convert to DTOs
   pure $ map rowToDTO rows
@@ -96,34 +101,40 @@ lookupMorphology conn surahNum verseNum = do
       case decode segmentsJson of
         Just segmentDTOs ->
           let segs = map segmentFromDTO segmentDTOs
-          in case aggregateSegments segs of
-               (qWord:_) -> wordToDTO qWord
-               [] -> error "aggregateSegments returned empty list (should not happen)"
+           in case aggregateSegments segs of
+                (qWord : _) -> wordToDTO qWord
+                [] -> error "aggregateSegments returned empty list (should not happen)"
         Nothing -> error "Failed to decode segments JSON"
 
 -- | Look up verse by reference
 lookupVerse :: Connection -> Int -> Int -> IO (Maybe VerseText)
 lookupVerse conn surahNum verseNum = do
-  results <- query conn
-    "SELECT * FROM verses WHERE surah = ? AND verse = ?"
-    (surahNum, verseNum) :: IO [VerseText]
+  results <-
+    query
+      conn
+      "SELECT * FROM verses WHERE surah = ? AND verse = ?"
+      (surahNum, verseNum) ::
+      IO [VerseText]
   pure $ case results of
-    (v:_) -> Just v
-    []    -> Nothing
+    (v : _) -> Just v
+    [] -> Nothing
 
 -- | Look up all verses containing a specific root
 lookupVersesByRoot :: Connection -> RootText -> IO [VerseWithRoot]
 lookupVersesByRoot conn (RootText rootText) = do
   -- Query to find all verses containing words with this root
   -- Group by verse to get word positions and occurrences
-  rows <- query conn
-    "SELECT v.surah, v.verse, v.text, GROUP_CONCAT(w.word_position) as positions, COUNT(w.id) as occurrences \
-    \FROM quranic_words w \
-    \JOIN verses v ON w.surah = v.surah AND w.verse = v.verse \
-    \WHERE w.root = ? \
-    \GROUP BY v.surah, v.verse \
-    \ORDER BY v.surah ASC, v.verse ASC"
-    (Only rootText) :: IO [(Int, Int, Text, Text, Int)]
+  rows <-
+    query
+      conn
+      "SELECT v.surah, v.verse, v.text, GROUP_CONCAT(w.word_position) as positions, COUNT(w.id) as occurrences \
+      \FROM quranic_words w \
+      \JOIN verses v ON w.surah = v.surah AND w.verse = v.verse \
+      \WHERE w.root = ? \
+      \GROUP BY v.surah, v.verse \
+      \ORDER BY v.surah ASC, v.verse ASC"
+      (Only rootText) ::
+      IO [(Int, Int, Text, Text, Int)]
 
   -- Convert rows to VerseWithRoot
   pure $ map rowToVerseWithRoot rows
@@ -131,69 +142,97 @@ lookupVersesByRoot conn (RootText rootText) = do
     rowToVerseWithRoot :: (Int, Int, Text, Text, Int) -> VerseWithRoot
     rowToVerseWithRoot (surahNum, verseNum, verseText, positionsStr, occurrences) =
       let ref = case mkVerseRef surahNum verseNum of
-                  Just r -> r
-                  Nothing -> error $ "Invalid verse reference: " <> show surahNum <> ":" <> show verseNum
+            Just r -> r
+            Nothing -> error $ "Invalid verse reference: " <> show surahNum <> ":" <> show verseNum
           -- Parse comma-separated positions (e.g., "1,5,10")
           positions = map (read . T.unpack) $ T.split (== ',') positionsStr
           -- Get surah name from metadata
           surahNameArabic = case getSurahInfo surahNum of
-                        Just info -> arabic (surahName info)
-                        Nothing -> ""
-      in VerseWithRoot
-          { vwrVerseRef = ref
-          , vwrText = verseText
-          , vwrRoot = rootText
-          , vwrSurahName = surahNameArabic
-          , vwrWordIndices = positions
-          , vwrOccurrences = occurrences
-          }
+            Just info -> arabic (surahName info)
+            Nothing -> ""
+       in VerseWithRoot
+            { vwrVerseRef = ref,
+              vwrText = verseText,
+              vwrRoot = rootText,
+              vwrSurahName = surahNameArabic,
+              vwrWordIndices = positions,
+              vwrOccurrences = occurrences
+            }
 
 -- | Look up all verses containing a specific word (not necessarily a root)
--- This searches the verse text directly for word occurrences
+-- This searches the quranic_words table for exact word matches (surface_form or lemma)
+-- Handles diacritics by normalizing both search term and database values
 lookupVersesByWord :: Connection -> Text -> IO [VerseWithRoot]
 lookupVersesByWord conn wordText = do
   -- First check if it's a root in the morphology database
-  rootResults <- query conn
-    "SELECT DISTINCT root FROM quranic_words WHERE root = ? LIMIT 1"
-    (Only wordText) :: IO [Only (Maybe Text)]
+  rootResults <-
+    query
+      conn
+      "SELECT DISTINCT root FROM quranic_words WHERE root = ? LIMIT 1"
+      (Only wordText) ::
+      IO [Only (Maybe Text)]
 
   case rootResults of
     -- If it's a root, use the normal root-based search
-    (Only (Just _):_) -> lookupVersesByRoot conn (RootText wordText)
-    -- If not a root, search verse text directly using normalized text
+    (Only (Just _) : _) -> lookupVersesByRoot conn (RootText wordText)
+    -- If not a root, search quranic_words table for exact word matches
     _ -> do
-      -- Normalize the search term to match against text_normalized column
-      -- This handles: diacritics, hamza variations, alif variations, ya variations
-      let normalized = normalizeArabicText wordText
+      -- Get all words with their surface forms and lemmas for filtering
+      allWords <-
+        query
+          conn
+          "SELECT w.surface_form, w.lemma, w.surah, w.verse, w.word_position, v.text \
+          \FROM quranic_words w \
+          \JOIN verses v ON w.surah = v.surah AND w.verse = v.verse \
+          \ORDER BY w.surah ASC, w.verse ASC, w.word_position ASC"
+          () ::
+          IO [(Maybe Text, Maybe Text, Int, Int, Int, Text)]
 
-      rows <- query conn
-        "SELECT DISTINCT v.surah, v.verse, v.text \
-        \FROM verses v \
-        \WHERE v.text_normalized LIKE ? \
-        \ORDER BY v.surah ASC, v.verse ASC"
-        (Only ("%" <> normalized <> "%")) :: IO [(Int, Int, Text)]
+      -- Normalize search term once
+      let normalizedSearch = normalizeArabicText wordText
 
-      -- Convert rows to VerseWithRoot (but mark as non-root)
-      pure $ map rowToVerseWithWord rows
+      -- Filter matches where surface_form or lemma normalizes to our search term
+      let matchingWords =
+            filter
+              ( \(sf, lm, _, _, _, _) ->
+                  let normSf = maybe "" normalizeArabicText sf
+                      normLm = maybe "" normalizeArabicText lm
+                   in normSf == normalizedSearch || normLm == normalizedSearch
+              )
+              allWords
+
+      -- Group results by verse and aggregate word positions
+      pure $ groupByVerse matchingWords []
   where
-    rowToVerseWithWord :: (Int, Int, Text) -> VerseWithRoot
-    rowToVerseWithWord (surahNum, verseNum, verseText) =
-      let ref = case mkVerseRef surahNum verseNum of
-                  Just r -> r
-                  Nothing -> error $ "Invalid verse reference: " <> show surahNum <> ":" <> show verseNum
-          -- Get surah name from metadata
-          surahNameArabic = case getSurahInfo surahNum of
-                        Just info -> arabic (surahName info)
-                        Nothing -> ""
-          -- For non-root words, we don't have word positions, use empty list
-      in VerseWithRoot
-          { vwrVerseRef = ref
-          , vwrText = verseText
-          , vwrRoot = wordText
-          , vwrSurahName = surahNameArabic
-          , vwrWordIndices = []  -- No positions for non-root words
-          , vwrOccurrences = 1   -- Assuming at least 1 occurrence
-          }
+    groupByVerse :: [(Maybe Text, Maybe Text, Int, Int, Int, Text)] -> [VerseWithRoot] -> [VerseWithRoot]
+    groupByVerse [] acc = reverse acc
+    groupByVerse ((_, _, surah, verse, wordPos, verseText) : rest) acc =
+      case break (\v -> vwrVerseRef v == verseRef) acc of
+        (before, v : after) ->
+          -- Found matching verse, append word position and increment count
+          let updatedV = v {vwrWordIndices = vwrWordIndices v ++ [wordPos], vwrOccurrences = vwrOccurrences v + 1}
+           in groupByVerse rest (before ++ [updatedV] ++ after)
+        _ ->
+          -- New verse, add it
+          let surahNameArabic = case getSurahInfo surah of
+                Just info -> arabic (surahName info)
+                Nothing -> ""
+           in groupByVerse
+                rest
+                ( VerseWithRoot
+                    { vwrVerseRef = verseRef,
+                      vwrText = verseText,
+                      vwrRoot = wordText,
+                      vwrSurahName = surahNameArabic,
+                      vwrWordIndices = [wordPos],
+                      vwrOccurrences = 1
+                    }
+                    : acc
+                )
+      where
+        verseRef = case mkVerseRef surah verse of
+          Just r -> r
+          Nothing -> error $ "Invalid verse reference: " <> show surah <> ":" <> show verse
 
 -- | Perform phonosemantic analysis using Hassan Abbas's theory
 performAnalysis :: DatabaseConnections -> Text -> IO WordAnalysis
@@ -205,7 +244,7 @@ performAnalysis (DatabaseConnections dictConn quranConn) word = do
   rootMaybe <- findWordRoot quranConn word
 
   -- 3. Build letter breakdown with meanings from database (uses aralex.db)
-  letterBreakdowns <- mapM (buildLetterBreakdown quranConn) (zip [1..] letters)
+  letterBreakdowns <- mapM (buildLetterBreakdown quranConn) (zip [1 ..] letters)
 
   -- 4. Detect phonosemantic patterns
   let patterns = detectPatterns letters letterBreakdowns
@@ -218,27 +257,31 @@ performAnalysis (DatabaseConnections dictConn quranConn) word = do
   -- 6. Synthesize composite meaning from letter meanings
   let compositeMeaning' = synthesizeMeaning letterBreakdowns patterns
 
-  pure $ WordAnalysis
-    { analyzedWord = word
-    , analysisRoot = rootMaybe
-    , letterBreakdown = letterBreakdowns
-    , patterns = patterns
-    , compositeMeaning = compositeMeaning'
-    , dictEvidence = []
-    , quranicEvidence = quranEvid
-    , analysisConfidence = 1.0
-    }
+  pure $
+    WordAnalysis
+      { analyzedWord = word,
+        analysisRoot = rootMaybe,
+        letterBreakdown = letterBreakdowns,
+        patterns = patterns,
+        compositeMeaning = compositeMeaning',
+        dictEvidence = [],
+        quranicEvidence = quranEvid,
+        analysisConfidence = 1.0
+      }
 
 -- | Try to find the root of a word by querying morphology
 -- Normalizes the input word (removes diacritics) and searches by root
 findWordRoot :: Connection -> Text -> IO (Maybe RootText)
 findWordRoot conn word = do
   let RootText normalizedWord = normalizeRoot (RootText word)
-  results <- query conn
-    "SELECT DISTINCT root FROM quranic_words WHERE root = ? AND root IS NOT NULL LIMIT 1"
-    (Only normalizedWord) :: IO [Only (Maybe Text)]
+  results <-
+    query
+      conn
+      "SELECT DISTINCT root FROM quranic_words WHERE root = ? AND root IS NOT NULL LIMIT 1"
+      (Only normalizedWord) ::
+      IO [Only (Maybe Text)]
   case results of
-    (Only (Just r):_) -> pure $ Just (RootText r)
+    (Only (Just r) : _) -> pure $ Just (RootText r)
     _ -> pure Nothing
 
 -- | Build letter breakdown with meaning from database
@@ -248,28 +291,34 @@ buildLetterBreakdown conn (pos, letter@(ArabicLetter letterText)) = do
   let normalizedLetter = normalizeLetter letterText
 
   -- Query letter meaning from database
-  meaningResult <- query conn
-    "SELECT primary_meaning_ar, primary_meaning_en, semantic_domains, examples FROM letter_meanings WHERE letter = ?"
-    (Only normalizedLetter) :: IO [(Text, Maybe Text, Text, Text)]
+  meaningResult <-
+    query
+      conn
+      "SELECT primary_meaning_ar, primary_meaning_en, semantic_domains, examples FROM letter_meanings WHERE letter = ?"
+      (Only normalizedLetter) ::
+      IO [(Text, Maybe Text, Text, Text)]
 
   let meaning = case meaningResult of
-        ((primaryAr, primaryEn, _domains, examplesJson):_) -> Just $ LetterMeaning
-          { letter = letter
-          , primaryMeaning = primaryAr
-          , semanticDomains = []  -- TODO: parse JSON domains
-          , arabicDesc = maybe primaryAr id primaryEn
-          , examples = []  -- TODO: parse JSON examples
-          }
+        ((primaryAr, primaryEn, _domains, examplesJson) : _) ->
+          Just $
+            LetterMeaning
+              { letter = letter,
+                primaryMeaning = primaryAr,
+                semanticDomains = [], -- TODO: parse JSON domains
+                arabicDesc = maybe primaryAr id primaryEn,
+                examples = [] -- TODO: parse JSON examples
+              }
         [] -> Nothing
 
-  pure $ LetterBreakdown
-    { position = pos
-    , letterChar = letter
-    , category = getLetterCategory letter
-    , articulation = getArticulationPoint letter
-    , attributes = getLetterAttributes letter
-    , meaning = meaning
-    }
+  pure $
+    LetterBreakdown
+      { position = pos,
+        letterChar = letter,
+        category = getLetterCategory letter,
+        articulation = getArticulationPoint letter,
+        attributes = getLetterAttributes letter,
+        meaning = meaning
+      }
 
 -- | Get phonetic attributes for a letter
 getLetterAttributes :: ArabicLetter -> [LetterAttribute]
@@ -309,24 +358,26 @@ getLetterAttributes (ArabicLetter t) = case T.unpack t of
 -- | Detect phonosemantic patterns in letters
 detectPatterns :: [ArabicLetter] -> [LetterBreakdown] -> [PhonosemanticPattern]
 detectPatterns letters breakdowns =
-  detectEmphatics letters ++
-  detectGutturals letters ++
-  detectLabials letters ++
-  detectMovement letters ++
-  detectOpening letters
+  detectEmphatics letters
+    ++ detectGutturals letters
+    ++ detectLabials letters
+    ++ detectMovement letters
+    ++ detectOpening letters
 
 -- | Detect emphatic consonant pattern (intensification)
 detectEmphatics :: [ArabicLetter] -> [PhonosemanticPattern]
 detectEmphatics letters =
   let emphaticLetters = filter isEmphatic letters
-  in if not (null emphaticLetters)
-     then [PhonosemanticPattern
-            { patternName = "التفخيم"
-            , letterSequence = emphaticLetters
-            , semanticEffect = "الحروف المفخمة (ط، ض، ص، ظ) تضيف قوة وشدة لمعنى الكلمة"
-            , confidence = 0.9
-            }]
-     else []
+   in if not (null emphaticLetters)
+        then
+          [ PhonosemanticPattern
+              { patternName = "التفخيم",
+                letterSequence = emphaticLetters,
+                semanticEffect = "الحروف المفخمة (ط، ض، ص، ظ) تضيف قوة وشدة لمعنى الكلمة",
+                confidence = 0.9
+              }
+          ]
+        else []
   where
     isEmphatic (ArabicLetter t) = t `elem` ["ط", "ض", "ص", "ظ"]
 
@@ -334,14 +385,16 @@ detectEmphatics letters =
 detectGutturals :: [ArabicLetter] -> [PhonosemanticPattern]
 detectGutturals letters =
   let gutturalLetters = filter isGuttural letters
-  in if length gutturalLetters >= 2
-     then [PhonosemanticPattern
-            { patternName = "العمق"
-            , letterSequence = gutturalLetters
-            , semanticEffect = "الحروف الحلقية (ء، ه، ع، ح، غ، خ) توحي بالعمق والباطنية والمفاهيم الروحية"
-            , confidence = 0.8
-            }]
-     else []
+   in if length gutturalLetters >= 2
+        then
+          [ PhonosemanticPattern
+              { patternName = "العمق",
+                letterSequence = gutturalLetters,
+                semanticEffect = "الحروف الحلقية (ء، ه، ع، ح، غ، خ) توحي بالعمق والباطنية والمفاهيم الروحية",
+                confidence = 0.8
+              }
+          ]
+        else []
   where
     isGuttural (ArabicLetter t) = t `elem` ["ء", "ه", "ع", "ح", "غ", "خ"]
 
@@ -349,14 +402,16 @@ detectGutturals letters =
 detectLabials :: [ArabicLetter] -> [PhonosemanticPattern]
 detectLabials letters =
   let labialLetters = filter isLabial letters
-  in if length labialLetters >= 2
-     then [PhonosemanticPattern
-            { patternName = "الاحتواء"
-            , letterSequence = labialLetters
-            , semanticEffect = "الحروف الشفوية (ب، م، و، ف) توحي بالجمع والاحتواء والضم"
-            , confidence = 0.75
-            }]
-     else []
+   in if length labialLetters >= 2
+        then
+          [ PhonosemanticPattern
+              { patternName = "الاحتواء",
+                letterSequence = labialLetters,
+                semanticEffect = "الحروف الشفوية (ب، م، و، ف) توحي بالجمع والاحتواء والضم",
+                confidence = 0.75
+              }
+          ]
+        else []
   where
     isLabial (ArabicLetter t) = t `elem` ["ب", "م", "و", "ف"]
 
@@ -364,13 +419,15 @@ detectLabials letters =
 detectMovement :: [ArabicLetter] -> [PhonosemanticPattern]
 detectMovement letters =
   if any isRa letters
-  then [PhonosemanticPattern
-         { patternName = "الحركة"
-         , letterSequence = filter isRa letters
-         , semanticEffect = "حرف الراء يدل على الاهتزاز والتكرار والحركة"
-         , confidence = 0.85
-         }]
-  else []
+    then
+      [ PhonosemanticPattern
+          { patternName = "الحركة",
+            letterSequence = filter isRa letters,
+            semanticEffect = "حرف الراء يدل على الاهتزاز والتكرار والحركة",
+            confidence = 0.85
+          }
+      ]
+    else []
   where
     isRa (ArabicLetter t) = t == "ر"
 
@@ -378,13 +435,15 @@ detectMovement letters =
 detectOpening :: [ArabicLetter] -> [PhonosemanticPattern]
 detectOpening letters =
   if any isFa letters
-  then [PhonosemanticPattern
-         { patternName = "الفتح"
-         , letterSequence = filter isFa letters
-         , semanticEffect = "حرف الفاء يدل على الفتح والانفصال والكشف"
-         , confidence = 0.85
-         }]
-  else []
+    then
+      [ PhonosemanticPattern
+          { patternName = "الفتح",
+            letterSequence = filter isFa letters,
+            semanticEffect = "حرف الفاء يدل على الفتح والانفصال والكشف",
+            confidence = 0.85
+          }
+      ]
+    else []
   where
     isFa (ArabicLetter t) = t == "ف"
 
@@ -392,52 +451,65 @@ detectOpening letters =
 gatherQuranicEvidence :: Connection -> RootText -> [ArabicLetter] -> IO [QuranicEvidence]
 gatherQuranicEvidence conn (RootText rootText) letters = do
   -- Query verses using this root
-  verses <- query conn
-    "SELECT v.surah, v.verse, v.text \
-    \FROM quranic_words w \
-    \JOIN verses v ON w.surah = v.surah AND w.verse = v.verse \
-    \WHERE w.root = ? \
-    \LIMIT 3"
-    (Only rootText) :: IO [(Int, Int, Text)]
+  verses <-
+    query
+      conn
+      "SELECT v.surah, v.verse, v.text \
+      \FROM quranic_words w \
+      \JOIN verses v ON w.surah = v.surah AND w.verse = v.verse \
+      \WHERE w.root = ? \
+      \LIMIT 3"
+      (Only rootText) ::
+      IO [(Int, Int, Text)]
 
-  pure $ map (\(surah, verse, text) ->
-    case mkVerseRef surah verse of
-      Just ref -> QuranicEvidence
-        { quranicVerseRef = ref
-        , wordContext = T.take 100 text  -- First 100 chars
-        , semanticContext = "Quranic usage of root " <> rootText
-        , quranicLetterSupport = letters
-        }
-      Nothing -> QuranicEvidence
-        { quranicVerseRef = VerseRef 1 1  -- Fallback
-        , wordContext = text
-        , semanticContext = "Invalid verse reference"
-        , quranicLetterSupport = []
-        }
-    ) verses
+  pure $
+    map
+      ( \(surah, verse, text) ->
+          case mkVerseRef surah verse of
+            Just ref ->
+              QuranicEvidence
+                { quranicVerseRef = ref,
+                  wordContext = T.take 100 text, -- First 100 chars
+                  semanticContext = "Quranic usage of root " <> rootText,
+                  quranicLetterSupport = letters
+                }
+            Nothing ->
+              QuranicEvidence
+                { quranicVerseRef = VerseRef 1 1, -- Fallback
+                  wordContext = text,
+                  semanticContext = "Invalid verse reference",
+                  quranicLetterSupport = []
+                }
+      )
+      verses
 
 -- | Synthesize composite meaning from letter breakdowns and patterns
 synthesizeMeaning :: [LetterBreakdown] -> [PhonosemanticPattern] -> Text
 synthesizeMeaning breakdowns _patterns =
   let letterMeanings = [primaryMeaning m | Just m <- map meaning breakdowns]
-      combined = if null letterMeanings
-                 then "لا توجد معاني للحروف"
-                 else T.intercalate "، " letterMeanings
-  in combined
+      combined =
+        if null letterMeanings
+          then "لا توجد معاني للحروف"
+          else T.intercalate "، " letterMeanings
+   in combined
 
 -- | Get all letter meanings
 getAllLetters :: Connection -> IO [(Text, Text, Text, Text)]
 getAllLetters conn = do
-  query_ conn
+  query_
+    conn
     "SELECT letter, letter_name_ar, primary_meaning_ar, primary_meaning_en FROM letter_meanings ORDER BY id"
 
 -- | Get meaning for a specific letter
 getLetterMeaning :: Connection -> Text -> IO (Maybe (Text, Text, Text, Text, Text, Text, Text, Text, Text, Text))
 getLetterMeaning conn letterChar = do
-  results <- query conn
-    "SELECT letter, letter_name_ar, category, articulation_point, primary_meaning_ar, primary_meaning_en, semantic_domains, attributes, examples, source_reference FROM letter_meanings WHERE letter = ?"
-    (Only letterChar) :: IO [(Text, Text, Text, Text, Text, Maybe Text, Text, Text, Text, Text)]
+  results <-
+    query
+      conn
+      "SELECT letter, letter_name_ar, category, articulation_point, primary_meaning_ar, primary_meaning_en, semantic_domains, attributes, examples, source_reference FROM letter_meanings WHERE letter = ?"
+      (Only letterChar) ::
+      IO [(Text, Text, Text, Text, Text, Maybe Text, Text, Text, Text, Text)]
   case results of
-    ((l, ln, c, ap, pma, pme, sd, a, e, sr):_) ->
+    ((l, ln, c, ap, pma, pme, sd, a, e, sr) : _) ->
       pure $ Just (l, ln, c, ap, pma, maybe "" id pme, sd, a, e, sr)
     [] -> pure Nothing

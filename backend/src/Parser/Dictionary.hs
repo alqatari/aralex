@@ -4,7 +4,7 @@ Description : JSON parser for dictionary entries
 Copyright   : (c) Ali Al-Qatari, 2025
 License     : MIT
 
-Parses JSON files containing dictionary entries from 7 classical dictionaries.
+Parses JSON files containing dictionary entries from 6 classical dictionaries (Qamus excluded).
 -}
 
 module Parser.Dictionary
@@ -52,7 +52,7 @@ getDictFilename dId =
     (meta:_) -> filename meta
     []       -> error $ "No metadata for dictionary: " <> show dId
 
--- | Load all 7 dictionaries
+-- | Load all 6 dictionaries (Qamus excluded)
 loadAllDictionaries :: FilePath -> IO (Either String [(DictionaryId, [DictEntry])])
 loadAllDictionaries dataDir = do
   results <- mapM loadOne [minBound .. maxBound]

@@ -5,7 +5,7 @@ Copyright   : (c) Ali Al-Qatari, 2025
 License     : MIT
 
 Database schema split into two databases:
-- aradicts.db: Classical dictionaries (7 sources, 40,645 entries)
+- aradicts.db: Classical dictionaries (6 sources, 30,310 entries, deduplicated)
 - aralex.db: Quranic corpus (morphology + verse text)
 -}
 

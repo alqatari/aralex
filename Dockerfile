@@ -18,47 +18,72 @@ FROM node:20-slim AS frontend-builder
 
 WORKDIR /build
 
-# Install spago and purescript
-RUN npm install -g purescript@0.15.15 spago@0.93.40
+# Install git (required by spago), spago, and purescript
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm install -g purescript@0.15.15 spago@0.93.40
 
-# Copy frontend source
+# Copy package files for dependency installation
 COPY frontend/package*.json /build/
+
+# Install npm dependencies first
+RUN npm install
+
+# Copy spago configuration
 COPY frontend/spago.yaml /build/
 COPY frontend/spago.lock /build/
+
+# Copy pre-built spago dependencies and output (to avoid network issues in Docker)
+COPY frontend/.spago/ /build/.spago/
+COPY frontend/output/ /build/output/
+
+# Copy frontend source and build files
 COPY frontend/src/ /build/src/
 COPY frontend/public/ /build/public/
+COPY frontend/index.js /build/
+COPY frontend/build.sh /build/
 
-# Install dependencies and build
-RUN npm install && \
-    spago build && \
-    spago bundle --outfile dist/bundle.js --platform browser
+# Build the frontend (dependencies already available from copied .spago and output)
+RUN chmod +x build.sh && ./build.sh
 
 # Stage 3: Runtime
 FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install runtime dependencies
+# Install runtime dependencies and locales
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     libgmp10 \
     libtinfo6 \
-    ca-certificates && \
+    ca-certificates \
+    locales && \
+    echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
+    locale-gen && \
     rm -rf /var/lib/apt/lists/*
 
+# Set UTF-8 locale environment
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
 # Copy backend binary
-COPY --from=backend-builder /build/bin/aralex-backend /app/
+COPY --from=backend-builder /build/bin/aralex-backend /app/backend/
 
 # Copy frontend files
 COPY --from=frontend-builder /build/dist/ /app/frontend/dist/
 COPY --from=frontend-builder /build/public/ /app/frontend/public/
 
 # Copy databases
-COPY backend/aradicts.db /app/
-COPY backend/aralex.db /app/
+COPY backend/aradicts.db /app/backend/
+COPY backend/aralex.db /app/backend/
 
 # Expose port
-EXPOSE 8181
+EXPOSE 8080
+
+# Set working directory to backend (so it can find ../frontend)
+WORKDIR /app/backend
 
 # Run the backend
-CMD ["/app/aralex-backend"]
+CMD ["./aralex-backend"]

@@ -6,20 +6,21 @@ Classical Arabic dictionary analysis combined with Quranic morphological corpus 
 
 - **Backend**: Haskell/Servant API
 - **Frontend**: PureScript/Halogen
-- **Data**: 40,645 dictionary entries + 130,030 Quranic morphemes
+- **Data**: 30,310 dictionary entries (deduplicated) + 130,030 Quranic morphemes
 - **Type Bridge**: purescript-bridge for type-safe communication
 
 
 ## Data Sources
 
-- **7 Classical Arabic Dictionaries** (40,645 entries)
-  - Kitab al-Ain (786 CE)
-  - Al-Sihah (1003 CE)
-  - Maqayis al-Lugha (1004 CE)
-  - Al-Muhkam (1066 CE)
-  - Al-Mufradat (1108 CE)
-  - Lisan al-Arab (1311 CE)
-  - Qamus al-Muhit (1414 CE)
+- **6 Classical Arabic Dictionaries** (30,310 entries, deduplicated)
+  - Kitab al-Ain (786 CE) - 2,707 entries
+  - Al-Sihah (1003 CE) - 5,594 entries
+  - Maqayis al-Lugha (1004 CE) - 4,794 entries
+  - Al-Muhkam (1066 CE) - 6,584 entries
+  - Al-Mufradat (1108 CE) - 1,602 entries
+  - Lisan al-Arab (1311 CE) - 9,029 entries
+
+  _Note: Qamus al-Muhit (1414 CE) JSON backup retained but excluded from database to reduce size/cost._
 
 - **Quranic Morphological Corpus** (130,030 morpheme segments)
   - Full morphological analysis with roots, lemmas, POS tags
