@@ -5,9 +5,11 @@ import Prelude
 import Data.Array (length, null, groupBy)
 import Data.Array as Array
 import Data.Array.NonEmpty (toArray, head)
+import Data.Foldable (traverse_)
 import Data.Either (Either(..))
 import Data.Int (floor)
 import Data.Maybe (Maybe(..))
+import Data.Number as Number
 import Data.String as String
 import Data.String.CodeUnits (toCharArray)
 import Data.String.Pattern (Pattern(..))
@@ -35,9 +37,12 @@ import Util.Clipboard (copyToClipboard)
 import Util.Arabic (removeTashkeel, filterArabicOnly, hasArabicChars, splitIntoTokens, TextToken(..))
 import Util.Time (formatTime)
 import Util.RootMatching (wordContainsRoot)
+import Util.Grammar as Grammar
 import Domain.Dictionary (DictEntry(..), RootText(..))
 import Domain.Verse (VerseWithRoot(..), VerseRef(..))
 import Domain.Phonosemantics (WordAnalysis(..), LetterBreakdown(..), LetterMeaning(..), LetterCategory(..), LetterAttribute(..), PhonosemanticPattern(..), ArabicLetter(..), DictionaryEvidence(..), QuranicEvidence(..))
+import Domain.MorphologyDTO (QuranicWordDTO(..), MorphSegmentDTO(..), MorphFeatureDTO(..))
+import Domain.Irab (IrabDetail(..), IrabSource(..))
 import Component.EtymologyGraphSimple as EtymologyGraph
 import Type.Proxy (Proxy(..))
 
@@ -62,6 +67,11 @@ type State =
   , legendExpanded :: Boolean  -- Track if color legend is expanded
   , showEtymologyGraph :: Boolean  -- Track if etymology graph modal is shown
   , isRoot :: Boolean  -- Track if current search word is a root word
+  , selectedWordForGrammar :: Maybe { verseKey :: String, wordIndex :: Int, word :: QuranicWordDTO }  -- Selected word for grammar panel
+  , grammarPanelExpanded :: Boolean  -- Track if grammar panel is expanded
+  , hoveredWord :: Maybe { verseKey :: String, wordIndex :: Int }  -- Track hovered word for tooltip
+  , verseMorphology :: Map String (Array QuranicWordDTO)  -- Cache morphology by verse key (surah:verse)
+  , verseIrab :: Map String (Array IrabDetail)  -- Cache i'rab by verse key (surah:verse)
   }
 
 data Action
@@ -87,6 +97,13 @@ data Action
   | ToggleAnalysis  -- Toggle analysis panel expansion
   | ToggleLegend  -- Toggle color legend expansion
   | ToggleEtymologyGraph  -- Toggle etymology graph modal
+  | SelectWordForGrammar String Int QuranicWordDTO  -- Select word for grammar panel (verseKey, wordIndex, word)
+  | CloseGrammarPanel  -- Close grammar panel
+  | HoverWord (Maybe { verseKey :: String, wordIndex :: Int })  -- Track hovered word
+  | FetchMorphology Int Int  -- Fetch morphology for verse (surah, verse)
+  | ReceiveMorphology String (Array QuranicWordDTO)  -- Store morphology result (verseKey, words)
+  | FetchIrab Int Int  -- Fetch i'rab for verse (surah, verse)
+  | ReceiveIrab String (Array IrabDetail)  -- Store i'rab result (verseKey, irabDetails)
 
 -- Slot type for child components
 type Slots = (etymologyGraph :: forall q. H.Slot q Void Unit)
@@ -127,6 +144,11 @@ initialState _ =
   , legendExpanded: false  -- Color legend collapsed by default
   , showEtymologyGraph: false  -- Graph modal hidden by default
   , isRoot: true  -- Assume root by default
+  , selectedWordForGrammar: Nothing  -- No word selected for grammar display
+  , grammarPanelExpanded: false  -- Grammar panel collapsed by default
+  , hoveredWord: Nothing  -- No word hovered initially
+  , verseMorphology: Map.empty  -- No morphology cached initially
+  , verseIrab: Map.empty  -- No i'rab cached initially
   }
 
 -- Utility functions imported from Util.* modules
@@ -174,7 +196,21 @@ handleAction = case _ of
     -- Toggle the expanded state for this Surah group
     expanded <- H.gets _.expandedSurahs
     let newExpanded = Map.alter toggleValue surahNum expanded
+        isNowExpanded = Map.lookup surahNum newExpanded == Just true
     H.modify_ _ { expandedSurahs = newExpanded }
+
+    -- If expanding, fetch morphology for verses in this surah
+    when isNowExpanded do
+      verses <- H.gets _.verses
+      let surahVerses = Array.filter (\(VerseWithRoot v) ->
+            let (VerseRef ref) = v.vwrVerseRef
+            in ref.refSurah == surahNum
+          ) verses
+      -- Fetch morphology for each verse in this surah
+      traverse_ (\(VerseWithRoot v) ->
+        let (VerseRef ref) = v.vwrVerseRef
+        in handleAction $ FetchMorphology ref.refSurah ref.refVerse
+      ) surahVerses
     where
       toggleValue Nothing = Just true
       toggleValue (Just val) = Just (not val)
@@ -299,6 +335,82 @@ handleAction = case _ of
   ToggleEtymologyGraph -> do
     -- Toggle the etymology graph modal
     H.modify_ \s -> s { showEtymologyGraph = not s.showEtymologyGraph }
+
+  SelectWordForGrammar verseKey wordIndex word -> do
+    -- Select a word to display its grammar panel
+    H.modify_ \s -> s
+      { selectedWordForGrammar = Just { verseKey, wordIndex, word }
+      , grammarPanelExpanded = true
+      }
+    -- Parse surah:verse from verseKey and fetch i'rab
+    case String.split (Pattern ":") verseKey of
+      [surahStr, verseStr] -> do
+        case {surah: floor <$> Number.fromString surahStr, verse: floor <$> Number.fromString verseStr} of
+          {surah: Just surah, verse: Just verse} -> do
+            handleAction (FetchIrab surah verse)
+          _ -> pure unit
+      _ -> pure unit
+
+  CloseGrammarPanel -> do
+    -- Close the grammar panel
+    H.modify_ \s -> s
+      { selectedWordForGrammar = Nothing
+      , grammarPanelExpanded = false
+      }
+
+  HoverWord wordInfo -> do
+    -- Track hovered word for tooltip display
+    H.modify_ \s -> s { hoveredWord = wordInfo }
+
+  FetchMorphology surah verse -> do
+    -- Fetch morphology data for a verse from the API
+    let verseKey = show surah <> ":" <> show verse
+    -- Check if already cached
+    cached <- H.gets (\s -> Map.lookup verseKey s.verseMorphology)
+    case cached of
+      Just _ -> pure unit  -- Already cached
+      Nothing -> do
+        -- Fetch from API
+        response <- H.liftAff $ AX.get ResponseFormat.json ("/api/v1/morphology/" <> show surah <> "/" <> show verse)
+        case response of
+          Left err -> do
+            -- Ignore errors silently for now
+            pure unit
+          Right res -> do
+            case decodeJson res.body of
+              Left _ -> pure unit
+              Right (words :: Array QuranicWordDTO) -> do
+                -- Store fetched morphology in cache directly
+                H.modify_ \s -> s { verseMorphology = Map.insert verseKey words s.verseMorphology }
+
+  ReceiveMorphology verseKey words -> do
+    -- Store fetched morphology in cache
+    H.modify_ \s -> s { verseMorphology = Map.insert verseKey words s.verseMorphology }
+
+  FetchIrab surah verse -> do
+    -- Fetch i'rab data for a verse from the API
+    let verseKey = show surah <> ":" <> show verse
+    -- Check if already cached
+    cached <- H.gets (\s -> Map.lookup verseKey s.verseIrab)
+    case cached of
+      Just _ -> pure unit  -- Already cached
+      Nothing -> do
+        -- Fetch from API
+        response <- H.liftAff $ AX.get ResponseFormat.json ("/api/v1/irab/" <> show surah <> "/" <> show verse)
+        case response of
+          Left err -> do
+            -- Ignore errors silently for now
+            pure unit
+          Right res -> do
+            case decodeJson res.body of
+              Left _ -> pure unit
+              Right (irabDetails :: Array IrabDetail) -> do
+                -- Store fetched i'rab in cache directly
+                H.modify_ \s -> s { verseIrab = Map.insert verseKey irabDetails s.verseIrab }
+
+  ReceiveIrab verseKey irabDetails -> do
+    -- Store fetched i'rab in cache
+    H.modify_ \s -> s { verseIrab = Map.insert verseKey irabDetails s.verseIrab }
 
   PerformSearch -> do
     query <- H.gets _.searchQuery
@@ -512,6 +624,43 @@ renderVerses state verses =
             else HH.div_ []
         ]
 
+    -- Render verse as clickable words with morphology
+    renderVerseWords :: State -> String -> String -> Int -> Int -> Array QuranicWordDTO -> H.ComponentHTML Action Slots m
+    renderVerseWords st verseKey searchRoot surah verse words =
+      HH.div
+        [ HP.class_ (HH.ClassName "verse-text")
+        , HP.style "direction: rtl; font-family: 'Scheherazade New', serif; font-size: 1.8rem; line-height: 2.2; cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px;"
+        ]
+        (Array.mapWithIndex (\idx (QuranicWordDTO word) ->
+          let isSelected = case st.selectedWordForGrammar of
+                Just sel -> sel.verseKey == verseKey && sel.wordIndex == idx
+                Nothing -> false
+              isHovered = case st.hoveredWord of
+                Just hov -> hov.verseKey == verseKey && hov.wordIndex == idx
+                Nothing -> false
+              wordColor = Grammar.posColor word.dtoWordPOS
+              -- Check if this word's root matches the searched root (from database, not pattern matching!)
+              wordMatchesRoot = case word.dtoWordRoot of
+                Just root -> removeTashkeel root == removeTashkeel searchRoot
+                Nothing -> false
+              -- Base styles for all words
+              baseStyle = "padding: 2px 4px; margin: 0 2px; border-radius: 4px; transition: all 0.2s;"
+              -- Root highlighting: bold red color for matching words
+              rootStyle = if wordMatchesRoot then "font-weight: 700; color: #e74c3c;" else ""
+              -- Selection highlighting
+              selectedStyle = if isSelected then "background: " <> wordColor <> "20; border-bottom: 2px solid " <> wordColor <> ";" else ""
+              -- Hover highlighting
+              hoverStyle = if isHovered then "background: " <> wordColor <> "10;" else ""
+          in HH.span
+            [ HP.style $ baseStyle <> rootStyle <> selectedStyle <> hoverStyle
+            , HE.onClick \_ -> SelectWordForGrammar verseKey idx (QuranicWordDTO word)
+            , HE.onMouseEnter \_ -> HoverWord (Just { verseKey, wordIndex: idx })
+            , HE.onMouseLeave \_ -> HoverWord Nothing
+            , HP.title $ Grammar.posToArabic word.dtoWordPOS  -- Quick preview on hover
+            ]
+            [ HH.text word.dtoFullSurface ]
+        ) words)
+
     -- Render individual verse within a Surah group
     renderVerse :: State -> VerseWithRoot -> H.ComponentHTML Action Slots m
     renderVerse st (VerseWithRoot verse) =
@@ -520,6 +669,8 @@ renderVerses state verses =
           tashkeelHidden = Map.lookup ("verse-" <> verseKey) st.hiddenTashkeel == Just true
           wasCopied = st.copiedItem == Just ("verse-" <> verseKey)
           displayText = if tashkeelHidden then removeTashkeel verse.vwrText else verse.vwrText
+          -- Check if we have morphology for this verse
+          morphology = Map.lookup verseKey st.verseMorphology
       in HH.div
         [ HP.style "margin-bottom: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: white;" ]
         [ -- Header container with verse ref and buttons
@@ -566,10 +717,23 @@ renderVerses state verses =
                     ]
                 ]
             ]
-        -- Verse text (always visible)
-        , HH.div
-            [ HP.class_ (HH.ClassName "verse-text") ]
-            [ highlightRootInText verse.vwrRoot displayText ]
+        -- Verse text (clickable words if morphology available, otherwise plain text)
+        , case morphology of
+            Just words ->
+              -- Render as clickable words with morphology (with root highlighting)
+              renderVerseWords st verseKey verse.vwrRoot ref.refSurah ref.refVerse words
+            Nothing ->
+              -- No morphology yet - render plain text and trigger fetch
+              HH.div
+                [ HP.class_ (HH.ClassName "verse-text")
+                , HP.ref (H.RefLabel verseKey)  -- Reference to trigger fetch on mount
+                ]
+                [ highlightRootInText verse.vwrRoot displayText ]
+        -- Grammar panel (if word is selected from this verse)
+        , case st.selectedWordForGrammar of
+            Just sel | sel.verseKey == verseKey ->
+              renderGrammarPanel st sel.word
+            _ -> HH.div_ []
         ]
 
 -- Phonosemantic Analysis Rendering Functions
@@ -1185,6 +1349,199 @@ renderEtymologyPanel state =
                   [ HH.slot _etymologyGraph unit EtymologyGraph.component rootRec.unRoot absurd ]
               else HH.div_ []
           ]
+
+-- Grammar Panel (إعراب) - Arabic only
+renderGrammarPanel :: forall m. State -> QuranicWordDTO -> H.ComponentHTML Action Slots m
+renderGrammarPanel state (QuranicWordDTO word) =
+  HH.div
+    [ HP.class_ (HH.ClassName "grammar-panel")
+    , HP.style "border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); overflow: hidden; background: white; margin-top: 16px;"
+    ]
+    [ -- Header
+      HH.div
+        [ HP.style $ "background: " <> Grammar.posColor word.dtoWordPOS <> "; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;" ]
+        [ HH.h3
+            [ HP.style "margin: 0; color: white; font-family: 'Scheherazade New', serif; font-size: 1.6rem; direction: rtl;" ]
+            [ HH.text $ "إعراب: " <> word.dtoFullSurface ]
+        , HH.button
+            [ HP.type_ HP.ButtonButton
+            , HP.style "background: rgba(255,255,255,0.2); color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer;"
+            , HP.title "إغلاق"
+            , HE.onClick \_ -> CloseGrammarPanel
+            ]
+            [ HH.i [ HP.class_ (HH.ClassName "material-icons") ] [ HH.text "close" ] ]
+        ]
+    -- Content (scrollable)
+    , HH.div
+        [ HP.style "padding: 20px; direction: rtl; font-family: 'Readex Pro', sans-serif; max-height: 600px; overflow-y: auto;" ]
+        [ -- Basic info grid
+          HH.div
+            [ HP.style "display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px;" ]
+            [ renderInfoBox "النوع" (Grammar.posToArabic word.dtoWordPOS) (Grammar.posColor word.dtoWordPOS)
+            , case word.dtoWordRoot of
+                Just root -> renderInfoBox "الجذر" root "#6366F1"
+                Nothing -> HH.div_ []
+            , case word.dtoWordLemma of
+                Just lemma -> renderInfoBox "اللمة" lemma "#8B5CF6"
+                Nothing -> HH.div_ []
+            ]
+        -- Detailed features (segment-by-segment breakdown) - horizontal grid layout
+        , HH.div
+            [ HP.style "border-top: 1px solid #e5e7eb; padding-top: 16px;" ]
+            [ HH.h4
+                [ HP.style "margin: 0 0 12px 0; font-size: 1.1rem; color: #374151;" ]
+                [ HH.text "تحليل المقاطع:" ]
+            , HH.div
+                [ HP.style "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;" ]
+                (map renderSegmentWithFeatures word.dtoSegments)
+            ]
+        -- I'rab section (traditional grammatical analysis)
+        , case state.selectedWordForGrammar of
+            Just sel -> renderIrabSection state sel.verseKey (sel.wordIndex + 1)
+            Nothing -> HH.div_ []
+        ]
+    ]
+  where
+    renderInfoBox :: String -> String -> String -> H.ComponentHTML Action Slots m
+    renderInfoBox label value color =
+      HH.div
+        [ HP.style $ "background: " <> color <> "15; border-right: 3px solid " <> color <> "; padding: 12px; border-radius: 6px;" ]
+        [ HH.div
+            [ HP.style "font-size: 0.85rem; color: #6b7280; margin-bottom: 4px;" ]
+            [ HH.text label ]
+        , HH.div
+            [ HP.style "font-size: 1.1rem; font-weight: 600; color: #111827;" ]
+            [ HH.text value ]
+        ]
+
+    renderSegmentWithFeatures :: MorphSegmentDTO -> H.ComponentHTML Action Slots m
+    renderSegmentWithFeatures (MorphSegmentDTO seg) =
+      let
+        segmentType = inferSegmentType seg.dtoFeatures
+        segmentColor = case segmentType of
+          "سابقة" -> "#3b82f6"  -- Blue for prefix
+          "لاحقة" -> "#8b5cf6"  -- Purple for suffix
+          _ -> "#10b981"        -- Green for stem
+      in
+        HH.div
+          [ HP.style $ "background: " <> segmentColor <> "15; border-right: 3px solid " <> segmentColor <> "; padding: 12px; border-radius: 6px;" ]
+          [ -- Segment type label (small, on top)
+            HH.div
+              [ HP.style "font-size: 0.85rem; color: #6b7280; margin-bottom: 4px;" ]
+              [ HH.text segmentType ]
+          -- Segment surface form (large, prominent)
+          , HH.div
+              [ HP.style "font-family: 'Scheherazade New', serif; font-size: 1.3rem; font-weight: 600; color: #111827; margin-bottom: 8px;" ]
+              [ HH.text seg.dtoSurface ]
+          -- Features as badges (compact)
+          , HH.div
+              [ HP.style "display: flex; flex-wrap: wrap; gap: 4px;" ]
+              (seg.dtoFeatures >>= renderFeatureBadge)
+          ]
+
+    inferSegmentType :: Array MorphFeatureDTO -> String
+    inferSegmentType features =
+      let
+        hasPrefix = Array.any (\f -> case f of
+          PrefixDTO -> true
+          _ -> false
+        ) features
+        hasSuffix = Array.any (\f -> case f of
+          SuffixDTO -> true
+          _ -> false
+        ) features
+      in
+        if hasPrefix then "سابقة"
+        else if hasSuffix then "لاحقة"
+        else "جذع"
+
+    renderFeatureBadge :: MorphFeatureDTO -> Array (H.ComponentHTML Action Slots m)
+    renderFeatureBadge feat =
+      case Grammar.featureToShortArabic feat of
+        Just label ->
+          [ HH.span
+              [ HP.style "background: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 16px; font-size: 0.9rem; white-space: nowrap; font-weight: 500;" ]
+              [ HH.text label ]
+          ]
+        Nothing -> []
+
+-- Render i'rab (traditional grammatical analysis) section
+renderIrabSection :: forall m. State -> String -> Int -> H.ComponentHTML Action Slots m
+renderIrabSection state verseKey wordPosition =
+  case Map.lookup verseKey state.verseIrab of
+    Nothing ->
+      -- No i'rab data yet - could be loading
+      HH.div
+        [ HP.style "border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;" ]
+        [ HH.div
+            [ HP.style "text-align: center; padding: 20px; color: #9ca3af;" ]
+            [ HH.text "جاري تحميل الإعراب..." ]
+        ]
+    Just irabList ->
+      case Array.find (\(IrabDetail irab) -> irab.irabWordPosition == wordPosition) irabList of
+        Nothing ->
+          -- No i'rab for this specific word
+          HH.div
+            [ HP.style "border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;" ]
+            [ HH.div
+                [ HP.style "text-align: center; padding: 20px; color: #9ca3af;" ]
+                [ HH.text "لا يوجد إعراب متاح لهذه الكلمة" ]
+            ]
+        Just (IrabDetail irab) ->
+          HH.div
+            [ HP.style "border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;" ]
+            [ HH.h4
+                [ HP.style "margin: 0 0 12px 0; font-size: 1.1rem; color: #374151;" ]
+                [ HH.text "الإعراب التقليدي:" ]
+            -- Full i'rab text (main display)
+            , HH.div
+                [ HP.style "background: #fef3c7; border-right: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 12px;" ]
+                [ HH.div
+                    [ HP.style "font-family: 'Scheherazade New', serif; font-size: 1.3rem; line-height: 1.8; color: #78350f;" ]
+                    [ HH.text irab.irabFullText ]
+                ]
+            -- Detailed breakdown grid
+            , HH.div
+                [ HP.style "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;" ]
+                [ case irab.irabGrammaticalRole of
+                    Just role -> renderIrabBox "الدور النحوي" role "#10b981"
+                    Nothing -> HH.div_ []
+                , case irab.irabConstructionType of
+                    Just construction -> renderIrabBox "نوع التركيب" construction "#3b82f6"
+                    Nothing -> HH.div_ []
+                , renderIrabBox "نوع الإعراب" irab.irabCaseType "#8b5cf6"
+                , case irab.irabCaseMarker of
+                    Just marker -> renderIrabBox "علامة الإعراب" marker "#ef4444"
+                    Nothing -> HH.div_ []
+                , case irab.irabCasePosition of
+                    Just position -> renderIrabBox "المحل الإعرابي" position "#f59e0b"
+                    Nothing -> HH.div_ []
+                ]
+            -- Source and confidence indicator
+            , HH.div
+                [ HP.style "margin-top: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #6b7280;" ]
+                [ HH.div_
+                    [ HH.text $ "المصدر: " <> case irab.irabSource of
+                        Inferred -> "مستنتج من المدونة الصرفية للقرآن الكريم"
+                        AljadwalOCR -> "الجدول في إعراب القرآن"
+                        Manual -> "تحقيق يدوي"
+                    ]
+                , HH.div_
+                    [ HH.text $ "الثقة: " <> show (floor (irab.irabConfidence * 100.0)) <> "%" ]
+                ]
+            ]
+  where
+    renderIrabBox :: String -> String -> String -> H.ComponentHTML Action Slots m
+    renderIrabBox label value color =
+      HH.div
+        [ HP.style $ "background: " <> color <> "15; border-right: 3px solid " <> color <> "; padding: 12px; border-radius: 6px;" ]
+        [ HH.div
+            [ HP.style "font-size: 0.85rem; color: #6b7280; margin-bottom: 4px;" ]
+            [ HH.text label ]
+        , HH.div
+            [ HP.style "font-size: 1.1rem; font-weight: 600; color: #111827; font-family: 'Scheherazade New', serif;" ]
+            [ HH.text value ]
+        ]
 
 render :: forall m. MonadAff m => State -> H.ComponentHTML Action Slots m
 render state =

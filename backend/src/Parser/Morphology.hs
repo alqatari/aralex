@@ -1,33 +1,35 @@
-{-|
-Module      : Parser.Morphology
-Description : TSV parser for Quranic morphology data
-Copyright   : (c) Ali Al-Qatari, 2025
-License     : MIT
+{-# LANGUAGE ImportQualifiedPost #-}
 
-Parses TSV morphology file (130,030 morpheme segments).
-Format: location → surface → POS → features
--}
-
+-- |
+-- Module      : Parser.Morphology
+-- Description : TSV parser for Quranic morphology data
+-- Copyright   : (c) Ali Al-Qatari, 2025
+-- License     : MIT
+--
+-- Parses TSV morphology file (130,030 morpheme segments).
+-- Format: location → surface → POS → features
 module Parser.Morphology
   ( -- * Parsing
-    parseMorphLine
-  , parseMorphFile
-  , parseMorphSegments
+    parseMorphLine,
+    parseMorphFile,
+    parseMorphSegments,
+
     -- * Loading
-  , loadMorphologyData
+    loadMorphologyData,
+
     -- * Feature Parsing
-  , parseFeatures
-  , parseLocation
-  , parsePOSTag
-  ) where
+    parseFeatures,
+    parseLocation,
+    parsePOSTag,
+  )
+where
 
 import Control.Applicative ((<|>))
 import Data.Attoparsec.Text as A
 import Data.Char (isDigit)
 import Data.Text (Text)
-import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
-
+import Data.Text qualified as T
+import Data.Text.IO qualified as TIO
 import Domain.Morphology
 
 -- | Parse location string: "surah:verse:word:segment"
@@ -39,14 +41,14 @@ parseLocation = do
   seg <- decimal
   case mkLocation s v w seg of
     Just loc -> pure loc
-    Nothing  -> fail $ "Invalid location: " <> show (s, v, w, seg)
+    Nothing -> fail $ "Invalid location: " <> show (s, v, w, seg)
 
 -- | Parse POS tag (N, V, P)
 parsePOSTag :: Parser PartOfSpeech
 parsePOSTag =
-      (char 'N' *> pure Noun)
-  <|> (char 'V' *> pure Verb)
-  <|> (char 'P' *> pure Particle)
+  (char 'N' *> pure Noun)
+    <|> (char 'V' *> pure Verb)
+    <|> (char 'P' *> pure Particle)
 
 -- | Parse pipe-delimited features
 parseFeatures :: Parser [MorphFeature]
@@ -55,94 +57,132 @@ parseFeatures = feature `sepBy` char '|'
     feature :: Parser MorphFeature
     feature =
       -- Root and Lemma
-          (string "ROOT:" *> (Root <$> A.takeWhile1 (/= '|')))
-      <|> (string "LEM:" *> (Lemma <$> A.takeWhile1 (/= '|')))
-      -- Prefix/Suffix
-      <|> (string "PREF" *> pure Prefix)
-      <|> (string "SUFF" *> pure Suffix)
-      -- Verb aspect
-      <|> (string "PERF" *> pure Perfect)
-      <|> (string "IMPF" *> pure Imperfect)
-      <|> (string "IMPV" *> pure Imperative)
-      -- Verb form
-      <|> (string "VF:" *> (VerbFormF <$> parseVerbForm))
-      -- Mood
-      <|> (string "MOOD:IND" *> pure (Mood Indicative))
-      <|> (string "MOOD:SUBJ" *> pure (Mood Subjunctive))
-      <|> (string "MOOD:JUS" *> pure (Mood Jussive))
-      -- Participles
-      <|> (string "ACT_PCPL" *> pure ActiveParticiple)
-      <|> (string "PASS_PCPL" *> pure PassiveParticiple)
-      -- Particle types (MUST come before single-letter Number/Gender/Preposition)
-      <|> (string "DET" *> pure Determiner)
-      <|> (string "CONJ" *> pure Conjunction)
-      <|> (string "NEG" *> pure Negation)
-      <|> (string "REL" *> pure RelativePronoun)
-      <|> (string "EXP" *> pure Exceptive)
-      -- Definiteness (DEF must come before D for Dual)
-      <|> (string "DEF" *> pure (Definiteness Domain.Morphology.Definite))
-      <|> (string "INDEF" *> pure (Definiteness Indefinite))
-      -- Noun type (PN/PRON must come before P for Plural/Preposition)
-      <|> (string "PRON" *> pure Pronoun)
-      <|> (string "PN" *> pure ProperNoun)
-      <|> (string "ADJ" *> pure Adjective)
-      -- Case (NOM must come before N for Noun in parsePOSTag)
-      <|> (string "NOM" *> pure (Case Nominative))
-      <|> (string "ACC" *> pure (Case Accusative))
-      <|> (string "GEN" *> pure (Case Genitive))
-      -- Number (after DET/DEF/INDEF to avoid D conflict)
-      <|> (string "S" *> pure (Number Singular))
-      <|> (string "D" *> pure (Number Dual))
-      <|> (string "P" *> pure (Number Plural))
-      -- Gender
-      <|> (string "M" *> pure (Gender Masculine))
-      <|> (string "F" *> pure (Gender Feminine))
-      -- Person/Gender/Number (must come before single P)
-      <|> parsePGN
-      -- Preposition (single P - must come LAST after all P-prefixed features)
-      <|> (string "P" *> pure Preposition)
-      -- Fallback for unknown features (ignore)
-      <|> (A.takeWhile1 (/= '|') *> fail "Unknown feature")
+      (string "ROOT:" *> (Root <$> A.takeWhile1 (/= '|')))
+        <|> (string "LEM:" *> (Lemma <$> A.takeWhile1 (/= '|')))
+        -- Particle families (FAM: must come before other features)
+        <|> (string "FAM:" *> (ParticleFamily <$> parseFamily))
+        -- Prefix/Suffix
+        <|> (string "PREF" *> pure Prefix)
+        <|> (string "SUFF" *> pure Suffix)
+        -- Verb aspect
+        <|> (string "PERF" *> pure Perfect)
+        <|> (string "IMPF" *> pure Imperfect)
+        <|> (string "IMPV" *> pure Imperative)
+        -- Voice (PASS must come before PASS_PCPL)
+        <|> (string "PASS_PCPL" *> pure PassiveParticiple)
+        <|> (string "PASS" *> pure (Voice Passive))
+        -- Verb form
+        <|> (string "VF:" *> (VerbFormF <$> parseVerbForm))
+        -- Mood
+        <|> (string "MOOD:IND" *> pure (Mood Indicative))
+        <|> (string "MOOD:SUBJ" *> pure (Mood Subjunctive))
+        <|> (string "MOOD:JUS" *> pure (Mood Jussive))
+        -- Participles
+        <|> (string "ACT_PCPL" *> pure ActiveParticiple)
+        -- Special markers (before basic particles)
+        <|> (string "EMPH" *> pure Emphasis)
+        <|> (string "VOC" *> pure Vocative)
+        <|> (string "INTG" *> pure Interrogative)
+        <|> (string "ANS" *> pure Answer)
+        <|> (string "REM" *> pure Restriction)
+        <|> (string "CIRC" *> pure Circumstantial)
+        <|> (string "PRP" *> pure Purpose)
+        <|> (string "FUT" *> pure Future)
+        <|> (string "PROH" *> pure Prohibition)
+        <|> (string "RSLT" *> pure Resumption)
+        <|> (string "CAUS" *> pure Cause)
+        <|> (string "RET" *> pure Retraction)
+        <|> (string "INC" *> pure Inchoative)
+        <|> (string "SUP" *> pure Surprise)
+        <|> (string "PREV" *> pure Preventive)
+        <|> (string "AMD" *> pure Amplification)
+        <|> (string "EXL" *> pure Interpretation)
+        <|> (string "CERT" *> pure Certainty)
+        <|> (string "COM" *> pure Comitative)
+        <|> (string "EQ" *> pure Equalization)
+        <|> (string "COND" *> pure Conditional)
+        <|> (string "LOC" *> pure Location)
+        <|> (string "T" *> pure Time)
+        -- Particle types (MUST come before single-letter Number/Gender/Preposition)
+        <|> (string "DET" *> pure Determiner)
+        <|> (string "CONJ" *> pure Conjunction)
+        <|> (string "NEG" *> pure Negation)
+        <|> (string "REL" *> pure RelativePronoun)
+        <|> (string "EXP" *> pure Exceptive)
+        -- Definiteness (DEF must come before D for Dual)
+        <|> (string "DEF" *> pure (Definiteness Domain.Morphology.Definite))
+        <|> (string "INDEF" *> pure (Definiteness Indefinite))
+        -- Noun type (PN/PRON must come before P for Plural/Preposition)
+        <|> (string "PRON" *> pure Pronoun)
+        <|> (string "PN" *> pure ProperNoun)
+        <|> (string "ADJ" *> pure Adjective)
+        -- Case (NOM must come before N for Noun in parsePOSTag)
+        <|> (string "NOM" *> pure (Case Nominative))
+        <|> (string "ACC" *> pure (Case Accusative))
+        <|> (string "GEN" *> pure (Case Genitive))
+        -- Number (after DET/DEF/INDEF to avoid D conflict)
+        <|> (string "S" *> pure (Number Singular))
+        <|> (string "D" *> pure (Number Dual))
+        <|> (string "P" *> pure (Number Plural))
+        -- Gender
+        <|> (string "M" *> pure (Gender Masculine))
+        <|> (string "F" *> pure (Gender Feminine))
+        -- Person/Gender/Number (must come before single P)
+        <|> parsePGN
+        -- Preposition (single P - must come LAST after all P-prefixed features)
+        <|> (string "P" *> pure Preposition)
+        -- Fallback for unknown features (ignore gracefully)
+        <|> (A.takeWhile1 (/= '|') *> pure Prefix) -- Changed to accept unknown features
+    parseFamily :: Parser ParticleFamily
+    parseFamily = do
+      familyText <- A.takeWhile1 (/= '|')
+      pure $ case familyText of
+        "إِنّ" -> InnFamily
+        "كان" -> KanaFamily
+        "لو" -> LawFamily
+        "ظن" -> ZannFamily
+        "رجا" -> RajaaFamily
+        other -> OtherFamily other
 
     parseVerbForm :: Parser VerbForm
     parseVerbForm = do
       n <- decimal
       case n :: Int of
-        1  -> pure Form1
-        2  -> pure Form2
-        3  -> pure Form3
-        4  -> pure Form4
-        5  -> pure Form5
-        6  -> pure Form6
-        7  -> pure Form7
-        8  -> pure Form8
-        9  -> pure Form9
+        1 -> pure Form1
+        2 -> pure Form2
+        3 -> pure Form3
+        4 -> pure Form4
+        5 -> pure Form5
+        6 -> pure Form6
+        7 -> pure Form7
+        8 -> pure Form8
+        9 -> pure Form9
         10 -> pure Form10
-        _  -> fail $ "Invalid verb form: " <> show n
+        _ -> fail $ "Invalid verb form: " <> show n
 
     parsePGN :: Parser MorphFeature
     parsePGN =
-          (string "1S" *> pure (PGN FirstPersonSingular))
-      <|> (string "1P" *> pure (PGN FirstPersonPlural))
-      <|> (string "2MS" *> pure (PGN SecondPersonMaleSingular))
-      <|> (string "2FS" *> pure (PGN SecondPersonFemaleSingular))
-      <|> (string "2MD" *> pure (PGN SecondPersonMaleDual))
-      <|> (string "2FD" *> pure (PGN SecondPersonFemaleDual))
-      <|> (string "2MP" *> pure (PGN SecondPersonMalePlural))
-      <|> (string "2FP" *> pure (PGN SecondPersonFemalePlural))
-      <|> (string "3MS" *> pure (PGN ThirdPersonMaleSingular))
-      <|> (string "3FS" *> pure (PGN ThirdPersonFemaleSingular))
-      <|> (string "3MD" *> pure (PGN ThirdPersonMaleDual))
-      <|> (string "3FD" *> pure (PGN ThirdPersonFemaleDual))
-      <|> (string "3MP" *> pure (PGN ThirdPersonMalePlural))
-      <|> (string "3FP" *> pure (PGN ThirdPersonFemalePlural))
+      (string "1S" *> pure (PGN FirstPersonSingular))
+        <|> (string "1P" *> pure (PGN FirstPersonPlural))
+        <|> (string "2MS" *> pure (PGN SecondPersonMaleSingular))
+        <|> (string "2FS" *> pure (PGN SecondPersonFemaleSingular))
+        <|> (string "2MD" *> pure (PGN SecondPersonMaleDual))
+        <|> (string "2FD" *> pure (PGN SecondPersonFemaleDual))
+        <|> (string "2MP" *> pure (PGN SecondPersonMalePlural))
+        <|> (string "2FP" *> pure (PGN SecondPersonFemalePlural))
+        <|> (string "3MS" *> pure (PGN ThirdPersonMaleSingular))
+        <|> (string "3FS" *> pure (PGN ThirdPersonFemaleSingular))
+        <|> (string "3MD" *> pure (PGN ThirdPersonMaleDual))
+        <|> (string "3FD" *> pure (PGN ThirdPersonFemaleDual))
+        <|> (string "3MP" *> pure (PGN ThirdPersonMalePlural))
+        <|> (string "3FP" *> pure (PGN ThirdPersonFemalePlural))
 
 -- | Parse single TSV line into MorphSegment
 parseMorphLine :: Parser MorphSegment
 parseMorphLine = do
   loc <- parseLocation
   _ <- char '\t'
-  surf <- A.takeWhile (/= '\t')  -- Allow empty surface forms (implicit morphemes)
+  surf <- A.takeWhile (/= '\t') -- Allow empty surface forms (implicit morphemes)
   _ <- char '\t'
   pos <- parsePOSTag
   _ <- char '\t'
@@ -156,8 +196,8 @@ parseMorphLine = do
 -- | Parse entire morphology file
 parseMorphSegments :: Text -> Either String [MorphSegment]
 parseMorphSegments content =
-  let linesWithNum = zip [1..] (T.lines content)
-  in mapM parseLineWithNum linesWithNum
+  let linesWithNum = zip [1 ..] (T.lines content)
+   in mapM parseLineWithNum linesWithNum
   where
     parseLineWithNum :: (Int, Text) -> Either String MorphSegment
     parseLineWithNum (lineNum, line) =

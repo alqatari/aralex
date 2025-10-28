@@ -33,6 +33,7 @@ library
         Domain.Verse
         Domain.Phonosemantics
         Domain.EtymologyGraph
+        Domain.Irab
         Parser.Dictionary
         Parser.Morphology
         Parser.Verse

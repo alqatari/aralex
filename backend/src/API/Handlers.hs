@@ -16,6 +16,7 @@ module API.Handlers
     performAnalysis,
     getAllLetters,
     getLetterMeaning,
+    lookupIrab,
     DatabaseConnections (..),
   )
 where
@@ -29,6 +30,7 @@ import Database.SQLite.Simple
 -- Import FromRow instances
 import Database.Schema (DatabaseConnections (..))
 import Domain.Dictionary (DictEntry (..), DictionaryId, RootText (..), normalizeArabicText, normalizeRoot)
+import Domain.Irab (IrabDetail (..), IrabSource (..))
 import Domain.Morphology (MorphSegment, QuranicWord, aggregateSegments)
 import Domain.MorphologyDTO (QuranicWordDTO, segmentFromDTO, wordToDTO)
 import Domain.Phonosemantics
@@ -513,3 +515,16 @@ getLetterMeaning conn letterChar = do
     ((l, ln, c, ap, pma, pme, sd, a, e, sr) : _) ->
       pure $ Just (l, ln, c, ap, pma, maybe "" id pme, sd, a, e, sr)
     [] -> pure Nothing
+
+-- | Look up i'rab (traditional grammatical analysis) for a verse
+lookupIrab :: Connection -> Int -> Int -> IO [IrabDetail]
+lookupIrab conn surahNum verseNum =
+  query
+    conn
+    "SELECT word_position, word_surface, grammatical_role, construction_type, \
+    \case_type, case_marker, case_position, full_irab_text, source, confidence, \
+    \volume_number, page_number \
+    \FROM irab_details \
+    \WHERE surah = ? AND verse = ? \
+    \ORDER BY word_position"
+    (surahNum, verseNum)
